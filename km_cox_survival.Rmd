@@ -1,0 +1,8 @@
+---
+title: "Análisis estadístico"
+author: "Miguel Angel Vicente Mesonero"
+date: "2026-04-14"
+toc: true
+knit: pdf_document
+---
+
