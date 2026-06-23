@@ -1,0 +1,826 @@
+---
+title: "Script de R utilizando el entorno Pharmaverse"
+author: "Miguel Angel Vicente Mesonero"
+date: "2026-04-14"
+toc: true
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  tidy = FALSE, 
+  tidy.opts = list(width.cutoff = 30) 
+)
+```
+
+Añado la semilla para asegurar la reproducibilidad.
+
+```{r}
+set.seed(202)
+```
+
+## 0. Librerías
+
+```{r, message=FALSE,warning=FALSE}
+library(data.table)
+library(here)
+library(tibble)
+library(dplyr)
+library(lubridate)
+library(admiral)
+library(xportr)
+library(gtsummary)
+library(flextable)
+library(knitr)
+```
+
+## 1. Carga de archivos con datos simulados
+
+```{r}
+raw_dm <- fread (input = "./raw_data/raw_dm.csv")
+raw_qs <- fread("./raw_data/raw_qs.csv")
+raw_rs<- fread("./raw_data/raw_rs.csv")
+```
+
+## 2. Simulación de la tabla de efectos adversos/adverse events (ae)
+
+
+Para que la simulación sea realista los eventos adversos solo deberían ocurrir tras la fecha de consentimiento. Exploro los datos de la tabla de demografía (dm) para conocer inicio del ensayo.
+
+```{r}
+min(raw_dm$FECHA_CONSENTIMIENTO)
+```
+
+**¿Qué n tiene el ensayo clínico?**
+
+La tabla de demografía tiene 300 filas, cada una de ellas con un sujeto del estudio.
+
+```{r}
+glimpse(raw_dm)
+```
+
+Me aseguro de que cada fila corresponda a un paciente diferente y no estén repetidas.
+
+```{r}
+length(unique(raw_dm$ID_SUJETO))
+```
+
+```{r}
+n <- 300
+```
+
+Parámetros a tener en cuenta para hacer realistas los datos - En este ensayo publicado sobre AAA ocurre algún evento adverso en 80-90% de los participantes. (1)
+
+- En el mismo ensayo observamos los AE más reportados (infusion-related reaction, ARIA with microhemorrhages or hemosiderin deposits", ARIA-E, Headache, Fall, Urinary tract infection, superficial siderosis of central nervous system). En los 3 primeros hay diferencia en la frecuencia de aparición a favor del grupo experimental, mientras que en los 2 últimos la diferencia es apenas imperceptible. Decidimos no escoger AE diferentes para los grupos porque parece más realista que se midan los mismos efectos adversos en ambos grupos y adaptar la frecuencia de aparición de acuerdo al ensayo clínico que uso para ver las proporciones. (1)
+
+- La gravedad de los AE dependerá de cuál sea, la cefalea y las caídas no tendrán un grado 4 según el CTCAE (*Terminology Criteria for Adevrse Events*). (2) Además los EA suelen ser más frecuentes cuanto más leves, por lo que ajustamos las probabilidades en ese sentido.
+
+```{r}
+raw_ae<- raw_dm %>% sample_n(0.85*n) %>% 
+  mutate(
+    EVENTO = if_else(RAMA_ASIGNADA == "Anticuerpo monoclonal",
+                     sample(c("reaccion infusional", "ARIA-H","ARIA-E","Cefalea","Caida"),
+                            n(),
+                            replace = TRUE,
+                            prob = c(0.3,0.14,0.12,0.11,0.1)),
+                     sample(c("reaccion infusional", "ARIA-H","ARIA-E","Cefalea","Caida"),
+                            n(),
+                            replace=TRUE,
+                            prob = c(0.07,0.07,0.02,0.08,0.09))),
+    GRAVEDAD = if_else(EVENTO == c("reaccion infusional","ARIA-H", "ARIA-E"),
+                              sample(c(1,2,3,4),
+                                     n(),
+                                     replace=TRUE,
+                                     prob = c(0.7,0.15,0.1,0.05)),
+                              sample(c(1,2,3),
+                                     n(),
+                                     replace=TRUE,
+                                     prob = c(0.7,0.2,0.1))),
+    FECHA_INICIO_AE = FECHA_CONSENTIMIENTO + days(sample(5:40,
+                                                         n(),
+                                                         replace = TRUE)),
+    FECHA_FIN_AE = FECHA_INICIO_AE + days(sample(2:15,
+                                                      n(),
+                                                      replace=TRUE))) %>% 
+  select(ID_SUJETO,EVENTO,GRAVEDAD,FECHA_INICIO_AE,FECHA_FIN_AE) %>% 
+  arrange(ID_SUJETO)
+```
+
+Compruebo que la fecha del fin del EA sea posterior al inicio para asegurar el realismo de los datos.
+
+```{r}
+all(raw_ae$FECHA_FIN_AE>=raw_ae$FECHA_INICIO_AE)
+```
+
+**Limitaciones de mis datos**: en realidad un mismo paciente podría tener varios AE, mi código asigna al 85% de las personas un solo AE.
+
+## 3. Estandarización a SDTM
+
+Las variables siguen un código que facilita su seguimiento
+
+**Tabla DM- demographics**
+
+Algunas consideraciones:
+
+- El sexo en la terminología SDTM CT recoge los valores F para Female y M para Male. También están las posibilidades INTERSEX y U (unknown), sin sujetos en nuestro estudio. Exploramos cómo están en nuestras tablas para luego estandarizar los términos.
+
+- No tengo la fecha de nacimiento, por lo que escojo AGE antes que BRTHDTC, podríamos inferir el año de nacimiento con la edad y la fecha de consentimiento, pero ya estamos haciendo transformaciones en los datos.
+
+```{r}
+unique(raw_dm$SEXO)
+```
+
+```{r}
+fechas_contacto <- raw_rs %>%
+  select(ID_SUJETO, FECHA_ULTIMO_CONTACTO) %>%
+  distinct()
+```
+
+```{r}
+DM <- raw_dm %>% 
+  left_join(fechas_contacto, by = "ID_SUJETO") %>% 
+  mutate(
+    STUDYID = "AD-01",
+    DOMAIN = "DM",
+    SUBJID = ID_SUJETO,
+    SITEID = HOSPITAL,
+    USUBJID = paste(STUDYID,SUBJID,sep = "-"),
+    SEX = case_when(
+      SEXO %in% c("M", "Mujer") ~ "F",
+      SEXO %in% c("H","Hombre") ~ "M"),
+    ARM = RAMA_ASIGNADA,
+    
+    AGE = EDAD,
+    AGEU = "YEARS",
+    
+    RFICDTC = as.character(FECHA_CONSENTIMIENTO), 
+    RFPENDTC = as.character(FECHA_ULTIMO_CONTACTO)
+
+  ) %>% 
+  select (STUDYID,DOMAIN,USUBJID,SUBJID,SITEID,AGE,AGEU,SEX,ARM, RFICDTC,RFPENDTC)
+```
+
+**Tabla FT**
+
+Primero voy a crear una tabla raw_FT eliminando el ADAS-Cog de raw_qs, me quedo solo con el minimental
+
+```{r}
+raw_ft <- raw_qs
+raw_ft <- raw_ft[raw_ft$CUESTIONARIO != "ADAS-Cog",]
+```
+
+Ahora crearemos el dataframe FT con variables estándar.
+
+```{r}
+FT <- raw_ft %>% 
+  mutate(
+    STUDYID = "AD-01",
+    DOMAIN = "FT",
+    SUBJID = ID_SUJETO,
+    USUBJID = paste(STUDYID,SUBJID,sep = "-"),
+    
+    FTCAT = "MMSE",
+    FTTESTCD = "MMS1TN",
+    FTTEST = "Mini-Mental State Exam Total Score",
+    
+    FTORRES = as.character(PUNTUACION),
+    FTSTRESC = as.character(PUNTUACION),
+    FTSTRESN = as.numeric(PUNTUACION),
+    
+    VISIT = VISITA, 
+    VISITNUM = case_when(
+      VISIT == "BASAL"  ~ 1,
+      VISIT == "MES 6"  ~ 2,
+      VISIT == "MES 12" ~ 3)) %>% 
+  
+  group_by(USUBJID) %>% 
+  mutate(FTSEQ=row_number()) %>% 
+  ungroup() %>% 
+  
+  select(STUDYID, DOMAIN, USUBJID,FTSEQ, FTCAT, FTTESTCD, FTTEST, 
+         FTORRES, FTSTRESC, FTSTRESN, VISITNUM, VISIT)
+```
+
+**Tabla RS**
+
+La columna de deterioro clínico tiene respuestas heterogéneas.
+
+```{r}
+unique(raw_rs$DETERIORO_CLINICO)
+```
+
+Homogenizo la columna de DETERIORO_CLINICO. En la columna de Fecha de evento, cuando hay deterioro clínico aparece la fecha, cuando no lo hay no aparece. Que haya o no deterioro clínico debió ser valorado en una fecha, entendemos que si no lo ha habido al menos será en la fecha del último contacto.
+
+```{r}
+raw_rs <- raw_rs %>% 
+  mutate(
+    DETERIORO_CLINICO = case_when(
+      DETERIORO_CLINICO %in% c("Sí", "SI", "Si") ~ "Y",
+      DETERIORO_CLINICO %in% c("No", "no", "NO") ~ "N"),
+    FECHA_EVENTO = case_when(
+      is.na(FECHA_EVENTO) ~ FECHA_ULTIMO_CONTACTO,
+      TRUE ~ FECHA_EVENTO)
+    )
+```
+
+```{r}
+RS <- raw_rs %>% 
+  mutate(
+    STUDYID = "AD-01",
+    DOMAIN = "RS",
+    SUBJID = ID_SUJETO,
+    USUBJID = paste(STUDYID,SUBJID,sep = "-"),
+    
+    RSCAT = "CLEVAL",
+    RSTESTCD = "SYMPTDTR",
+    RSTEST = "Symptomatic Deterioration" ,
+    
+    RSORRES = as.character (DETERIORO_CLINICO),
+    RSSTRESC =toupper(as.character(DETERIORO_CLINICO)),
+    
+    RSDTC = as.character(FECHA_EVENTO),
+    LSTCNTC = as.character(FECHA_ULTIMO_CONTACTO)) %>%  #Esta variable no existe en CDISC, pero  me facilita pasarla a ADAM
+  
+  group_by(USUBJID) %>% 
+  mutate(RSSEQ=row_number()) %>% 
+  ungroup() %>% 
+  select(STUDYID, DOMAIN, USUBJID, RSSEQ, RSCAT, RSTESTCD, RSTEST, 
+         RSORRES, RSSTRESC, RSDTC,LSTCNTC)
+```
+
+**Tabla AE**
+
+```{r}
+AE <- raw_ae %>% 
+  mutate(
+    STUDYID = "AD-01",
+    DOMAIN = "AE",
+    SUBJID = ID_SUJETO,
+    USUBJID = paste(STUDYID,SUBJID,sep = "-"),
+    
+    
+    AETERM = EVENTO,
+    AEDECOD = toupper(EVENTO),
+    AESEV = GRAVEDAD,
+    AESTDTC = as.character(FECHA_INICIO_AE),
+    AEENDTC = as.character(FECHA_FIN_AE)) %>%
+  
+  group_by(USUBJID) %>% 
+  mutate(
+    AESEQ =row_number()) %>% 
+  ungroup() %>% 
+
+  select(STUDYID,DOMAIN,USUBJID,AESEQ,AETERM,AEDECOD,AESEV,AESTDTC,AEENDTC)
+    
+```
+
+**Tabla QS**
+
+Primero me quedo solo con ADAS-Cog y elimino el minimental, que correspondía a la tabla FT.
+
+```{r}
+raw_qs <- raw_qs[raw_qs$CUESTIONARIO == "ADAS-Cog",]
+```
+
+```{r}
+QS <- raw_qs %>% 
+  mutate(
+    STUDYID = "AD-01",
+    DOMAIN = "QS",
+    SUBJID = ID_SUJETO,
+    USUBJID = paste(STUDYID,SUBJID,sep = "-"),
+    
+    QSCAT = "ADAS-COG",
+    QSTESTCD = "ADASCGTL",
+    QSTEST = "ADAS-Cog Total Score",
+    
+    QSORRES = as.character(PUNTUACION),
+    QSSTRESC = as.character(PUNTUACION),
+    QSSTRESN = as.numeric(QSORRES),
+    
+    VISIT = VISITA,
+    VISITNUM = case_when(
+      VISIT == "BASAL" ~ 1,
+      VISIT == "MES 6" ~ 2,
+      VISIT == "MES 12" ~ 3))%>% 
+  
+  group_by(USUBJID) %>% 
+  mutate(QSSEQ=row_number()) %>% 
+  ungroup() %>% 
+  select(STUDYID, DOMAIN, USUBJID, QSSEQ, QSCAT, QSTESTCD, QSTEST, 
+         QSORRES, QSSTRESC, QSSTRESN, VISITNUM, VISIT)
+```
+
+**Tabla extra de características del sujeto (SC) para la información del APOE**
+
+```{r}
+SC <- raw_dm %>% 
+  mutate(
+    STUDYID = "AD-01",
+    DOMAIN  = "SC",
+    SUBJID  = ID_SUJETO,
+    USUBJID = paste(STUDYID, SUBJID, sep = "-"),
+    
+    SCTESTCD = "APOE4",
+    SCTEST   = "APOE4 Genotype",
+    
+    SCORRES  = as.character(GEN_APOE4),
+    SCSTRESC = toupper(as.character(GEN_APOE4))
+  ) %>% 
+  
+  group_by(USUBJID) %>% 
+  mutate(SCSEQ = row_number()) %>% 
+  ungroup() %>% 
+  
+  select(STUDYID, DOMAIN, USUBJID, SCSEQ, SCTESTCD, SCTEST, SCORRES, SCSTRESC)
+```
+
+Limpieza del environment
+
+```{r}
+rm(list = ls(pattern = "^raw_"))
+rm(n)
+```
+
+## 4.Derivación a ADAM
+
+**ADSL**
+
+ADSL contiene datos sobre demografía, exposición y disposición de un ensayo clínico.
+
+Debemos consolidar edad,sexo, hospital y las variables de estratificación basal, en nuestro caso 3: presencia de APOE3, puntuación de ADAS-Cog y puntuación de Minimental. También añadimos las fechas temporales: consentimiento, fecha de progresión de la enfermedad y ultimo contacto.
+
+```{r}
+ADSL <- DM %>%
+  
+  # 1. Inyección de Estratificación Gen APOE4
+  derive_vars_merged(
+    dataset_add = SC,
+    by_vars = exprs(USUBJID),
+    filter_add = SCTESTCD == "APOE4",
+    new_vars = exprs(STRAT1 = SCSTRESC)
+  ) %>%
+  
+  # 2. Inyección de ADAS-Cog Basal
+  derive_vars_merged(
+    dataset_add = QS,
+    by_vars = exprs(USUBJID),
+    filter_add = QSTESTCD == "ADASCGTL" & VISIT == "BASAL",
+    new_vars = exprs(ADASBL = QSSTRESN)
+  ) %>%
+  
+  # 3. Inyección de minimental (MSS1TN Basal)
+  derive_vars_merged(
+    dataset_add = FT,
+    by_vars = exprs(USUBJID),
+    filter_add = FTTESTCD == "MMS1TN" & VISIT == "BASAL",
+    new_vars = exprs(MMSEBL = FTSTRESN)) %>% 
+  
+  # 4. Inyección de Tiempo
+  derive_vars_dt(dtc = RFICDTC, new_vars_prefix = "RFIC") %>% 
+  derive_vars_dt(dtc = RFPENDTC, new_vars_prefix = "RFPEN") %>% 
+  derive_vars_merged(dataset_add = RS,
+                     by_vars = exprs(USUBJID),
+                     new_vars = exprs(RSDTC)) %>%
+  
+  # 5. Inyección de la variable deterioro sintomático
+  
+  derive_vars_merged(dataset_add = RS,
+                     by_vars = exprs(USUBJID),
+                     filter_add = RSTESTCD == "SYMPTDTR",
+                     new_vars = exprs(SYMPTFL = RSSTRESC,
+                                      PROGDT = as.Date(RSDTC))) %>%
+  
+  
+  # 6. Derivaciones finales dependientes de las nuevas variables
+  mutate(
+    STRAT2 = case_when(
+      MMSEBL >= 27 ~ "Normal",
+      MMSEBL >= 12 & MMSEBL < 27 ~ "Sospecha patológica",
+      MMSEBL < 12 ~ "Demencia"),
+    
+    TRT01A = ARM) %>%
+  
+  dplyr::select(STUDYID, USUBJID, SUBJID, SITEID, AGE, SEX, TRT01A, STRAT1,ADASBL,MMSEBL,STRAT2,SYMPTFL,RFICDT,PROGDT,RFPENDT)
+```
+
+**ADTTE**
+
+ADTTE es la variable de ADAM que va a incluir el tiempo hasta el evento. Derivaremos tiempo hasta el evento (AVAL) en días y la variable de censura (CNSR: 0 = evento, 1 = Censurado).
+
+```{r}
+
+ADTTE <- ADSL %>%
+  mutate(
+    # 1. Definición del Parámetro
+    PARAMCD = "TTP",
+    PARAM = "Tiempo hasta el Deterioro Sintomático (Días)",
+    
+    # 2. Fecha de inicio 
+    STARTDT = RFICDT, 
+    
+    # 3. Fecha de Análisis (ADT): 
+    ADT = case_when(
+      SYMPTFL == "Y" ~ PROGDT,  # Fecha de progresión si ha progresado
+      TRUE           ~ RFPENDT  # Fecha de último contacto si no progresó
+    ),
+    
+    # 4. Censura (0 = Evento, 1 = Censura)
+    CNSR = case_when(
+      SYMPTFL == "Y" ~ 0,  
+      TRUE           ~ 1   # Es de esta manera porque la censura depende del evento en nuestros casos
+    ),
+    
+    # 5. Cálculo del tiempo (AVAL) y añado unidades (AVALU)
+    AVAL = as.numeric(ADT - STARTDT+1),
+    AVALU = "DAYS"
+  ) %>%
+  
+  # 6. Selección final
+  dplyr::select(STUDYID, USUBJID, TRT01A, STRAT1, STRAT2, 
+                PARAMCD, PARAM, STARTDT, ADT, AVAL, AVALU, CNSR)
+```
+
+**ADQS**
+
+```{r}
+
+ADQS <- QS %>%
+  
+  # 1. Filtro inicial y Fusión con la Demografía
+  filter(QSTESTCD == "ADASCGTL") %>% 
+  
+  # 2. Cruce con ADSL usando TRT01A en lugar de ARM
+  left_join(
+    ADSL %>% dplyr::select(USUBJID, SITEID, AGE, SEX, TRT01A, STRAT1, STRAT2), 
+    by = "USUBJID") %>%
+  
+  # 3. Variables ADAM
+  mutate(
+    PARAMCD = QSTESTCD,
+    PARAM = "ADAS-Cog Total Score",
+    AVAL = as.numeric(QSSTRESN),
+    AVISIT = VISIT
+  ) %>%
+  
+  # 4. Bandera Basal
+  mutate(
+    ABLFL = case_when(
+      AVISIT == "BASAL" ~ "Y",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  
+  # 5. Derivación de BASE, CHG y PCHG
+  derive_var_base(
+    by_vars = exprs(USUBJID, PARAMCD),
+    source_var = AVAL,
+    new_var = BASE
+  ) %>%
+  derive_var_chg() %>% 
+  derive_var_pchg() %>%
+  mutate(
+    AVISITN = case_when(
+      AVISIT == "BASAL" ~ 0,
+      AVISIT == "MES 6" ~ 6,
+      AVISIT == "MES 12" ~ 12)) %>%
+  arrange(USUBJID, AVISITN) %>%
+  relocate(AVISITN, .after = AVISIT) %>%
+  
+  # 6. Selección final 
+  dplyr::select(STUDYID, USUBJID, SITEID, AGE, SEX, TRT01A, STRAT1, STRAT2, 
+                PARAMCD, PARAM, AVISIT, AVISITN, AVAL, ABLFL, BASE, CHG, PCHG) %>%
+  arrange(USUBJID, AVISITN)
+```
+
+**ADFT**
+
+```{r}
+ADFT <- FT %>%
+  
+  # 1. Filtro inicial para el Minimental
+  filter(FTTESTCD == "MMS1TN") %>% 
+  
+  # 2. Fusión con la Demografía (ADSL)
+  
+  left_join(
+    ADSL %>% dplyr::select( USUBJID, SITEID, AGE, SEX, TRT01A, STRAT1, STRAT2), 
+    by = "USUBJID"
+  ) %>%
+  
+  # 3. Mapeo de variables estándar BDS
+  mutate(
+    PARAMCD = FTTESTCD,
+    PARAM = "Mini-Mental State Examination Total Score",
+    AVAL = as.numeric(FTSTRESN),
+    AVISIT = VISIT,
+    
+    # Variable numérica para el orden cronológico
+    AVISITN = case_when(
+      AVISIT == "BASAL" ~ 0,
+      AVISIT == "MES 6" ~ 6,
+      AVISIT == "MES 12" ~ 12,
+      TRUE ~ NA_real_
+    )
+  ) %>%
+  
+  # 4. Identificación de la Visita de Referencia (Baseline)
+  mutate(
+    ABLFL = case_when(
+      AVISIT == "BASAL" ~ "Y",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  
+  # 5. Cálculos de Eficacia (Copia del valor basal y cambios)
+  derive_var_base(
+    by_vars = exprs(USUBJID, PARAMCD),
+    source_var = AVAL,
+    new_var = BASE
+  ) %>%
+  derive_var_chg() %>% 
+  derive_var_pchg() %>%
+  
+  # 6. Selección final y ordenación profesional
+  dplyr::select(STUDYID, USUBJID, SITEID, AGE, SEX, TRT01A, STRAT1, STRAT2, 
+                PARAMCD, PARAM, AVISIT, AVISITN, AVAL, ABLFL, BASE, CHG, PCHG) %>%
+  arrange(USUBJID, AVISITN)
+```
+
+**ADAE**
+
+```{r}
+
+ADAE <- AE %>%
+  
+  # 1. Fusión con la Demografía (ADSL)
+  left_join(
+    ADSL %>% dplyr::select(STUDYID, USUBJID, SITEID, AGE, SEX, TRT01A, RFICDT), 
+    by = c("STUDYID", "USUBJID")
+  ) %>%
+  
+  # 2. Renombrar a variables Adam
+  mutate(
+    
+    TRTEMFL_PROXY_DATE = as.Date(RFICDT), 
+    
+    ASTDT = as.Date(AESTDTC),           # Analysis Start Date (Inicio del síntoma)
+    AENDT = as.Date(AEENDTC)            # Analysis End Date (Fin del síntoma)
+  ) %>%
+
+  mutate(
+    TRTEMFL = case_when(
+      ASTDT >= TRTEMFL_PROXY_DATE ~ "Y",
+      TRUE ~ NA_character_ 
+    )
+  ) %>%
+  
+  # 4. Cálculo del Día Relativo (ADY)
+  
+  mutate(
+    ASTDY = as.numeric(ASTDT - TRTEMFL_PROXY_DATE) + 1,
+    AENDY = as.numeric(AENDT - TRTEMFL_PROXY_DATE) + 1
+  ) %>%
+  
+  # 5. Selección final OCCDS
+  dplyr::select(STUDYID, USUBJID, SITEID, AGE, SEX, TRT01A, 
+                AETERM, AEDECOD, AESEV, # Variables clínicas del evento
+                ASTDT, AENDT, ASTDY, AENDY,    # Variables temporales de análisis
+                TRTEMFL) %>%                
+  
+  # 6. Orden cronológico 
+  arrange(USUBJID, ASTDT, AETERM)
+```
+
+# 5. Exportar con xportr
+
+Exportamos .xpt
+
+```{r,eval=FALSE}
+lista_datasets <- list(DM=DM,AE=AE,FT=FT,QS=QS,RS=RS,SC=SC,ADSL=ADSL,ADTTE=ADTTE,ADQS=ADQS,ADFT=ADFT,ADAE=ADAE)
+
+for (i in seq_along(lista_datasets)){
+  data <- lista_datasets[[i]]
+  attr(data,"label") <- names(lista_datasets)[i]
+  xportr_write(data,
+               path = here(".xpt", paste0(tolower(names(lista_datasets)[i]),".xpt")),
+               max_size_gb = NULL,
+               metadata = NULL,
+               domain = tolower(names(lista_datasets)[i]))
+}
+```
+
+# 6. Tabla gtsummary que muestre la información basal de la cohorte
+
+```{r}
+tabla_1 <- ADSL %>%
+  mutate(SEX = factor(SEX,
+                      levels = c("F","M"), 
+                      labels = c("Mujer"," Hombre"))) %>% 
+  select (AGE,SEX,TRT01A,ADASBL,MMSEBL,STRAT1) %>%
+  tbl_summary(
+    by = TRT01A,
+    statistic = list(all_continuous() ~ "{mean} ({sd})", all_categorical() ~ "{n}({p}%)"),
+    label = list(AGE = "Edad", SEX = "Sexo", TRT01A = "Tratamiento", ADASBL = "ADAS-Basal", MMSEBL = "MMSE-Basal", STRAT1 = "Genotipo APOE4"),
+    missing_text = "Datos faltantes"
+  ) %>% 
+  add_overall(col_label = "**Toda la Cohorte**\n(N-{N})") %>% 
+  add_p() %>% 
+  bold_labels() %>% 
+  modify_header(label = "**Características Basales**") %>% 
+  modify_spanning_header(c("stat_1","stat_2")~ "**Rama de Tratamiento**") %>% 
+  as_flex_table()
+
+tabla_1
+
+```
+
+# Archivo de texto con los nombres de las variables y su significado
+
+```{r}
+# 1. Seleccionamos las tablas creadas
+lista_analisis <- list(DM=DM, AE=AE, FT=FT, QS=QS, RS=RS, SC=SC, 
+                       ADSL=ADSL, ADTTE=ADTTE, ADQS=ADQS, ADFT=ADFT, ADAE=ADAE)
+
+# 2. Estructura vacía
+diccionario_global <- data.frame(
+  Dataset = character(), 
+  Variable = character(), 
+  Significado = character(),
+  Clase = character(),
+  Origen = character(),
+  stringsAsFactors = FALSE
+)
+
+# 3. Bucle de extracción
+for (nombre_tabla in names(lista_analisis)) {
+  
+  tabla_actual <- lista_analisis[[nombre_tabla]]
+  columnas <- colnames(tabla_actual)
+  
+  # Extraemos el tipo de dato específico de CADA columna
+  clases_columnas <- sapply(tabla_actual, function(x) class(x)[1])
+  
+  temp_df <- data.frame(
+    Dataset = nombre_tabla,
+    Variable = columnas,
+    Significado = "[Rellenar aquí]",
+    Clase = clases_columnas, # Inyectamos el vector real (numeric, character, Date)
+    Origen = "[Rellenar aquí]",
+    stringsAsFactors = FALSE
+  )
+  
+  diccionario_global <- rbind(diccionario_global, temp_df)
+}
+
+rownames(diccionario_global) <- NULL
+
+#Extraigo las variables de SDTM (no derivadas)
+
+tablas_SDTM<-list(DM=DM, AE=AE, FT=FT, QS=QS, RS=RS, SC=SC)
+variables_SDTM <- lapply(tablas_SDTM, colnames) %>% unlist() %>% unique()
+```
+
+Ahora completo la información de cada variable. (3,4)
+
+```{r}
+
+diccionario_completo <- diccionario_global %>% 
+  mutate(Significado = case_when(
+    Variable == "STUDYID" ~ "Identificador único del estudio",
+    Variable == "DOMAIN"~ "Conjunto de observaciones con un tema específico",
+    Variable == "USUBJID" ~ "Identificador único del sujeto, en el ensayo y entre ensayos",
+    Variable == "SUBJID" ~ "Identificador del sujeto dentro de un ensayo",
+    Variable == "SITEID" ~ "Identificador del lugar donde se realiza el estudio",
+    Variable == "AGE" ~ "Edad del sujeto estudiado",
+    Variable == "AGEU" ~ "Unidades en las que se expresa la unidad del sujeto p.e. años",
+    Variable == "SEX" ~ "Sexo del sujeto estudiado",
+    Variable == "ARM" ~ "Nombre del grupo experimental al que pertenece el sujeto",
+    Variable == "RFICDTC" ~ "Fecha de la firma del consentimiento informado",
+    Variable == "RFPENDTC" ~ "Fecha de fin de la participación en el ensayo para el sujeto",
+    Variable == "AESEQ" ~ "Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio AE (Adverse Events)",
+    Variable == "AETERM" ~ "Nombre del evento adverso reportado",
+    Variable == "AEDECOD" ~ "Nombre estandarizado del evento adverso reportado",
+    Variable == "AESEV" ~ "Intensidad/severidad del evento adverso reportado",
+    Variable == "AESTDTC" ~ "Fecha de inicio del evento adverso reportado",
+    Variable == "AEENDTC" ~ "Fecha fin del evento reportado",
+    Variable == "FTSEQ" ~ "Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio FT (Functional Tests)",
+    Variable == "FTCAT" ~ "Categoría en la que se incluye el test funcional",
+    Variable == "FTTESTCD" ~ "Nombre corto del test",
+    Variable == "FTTEST" ~ "Nombre literal del test",
+    Variable == "FTORRES" ~ "Resultado del test tal cual fue recibido o medido",
+    Variable == "FTSTRESC" ~ "Resultado del test en formato estándar",
+    Variable == "FTSTRESN" ~ "Resultado del test en formato estándar numérico",
+    Variable == "VISITNUM" ~ "Numero asignado a un encuentro clínico",
+    Variable == "VISIT" ~ "Nombre del encuentro clínico",
+    Variable == "QSSEQ" ~ "Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio QS (Questionnaires)",
+    Variable == "QSCAT" ~ "Categoría en la que se incluye el cuestionario",
+    Variable == "QSTESTCD" ~ "Nombre corto del cuestionario",
+    Variable == "QSTEST" ~ "Nombre literal del cuestionario",
+    Variable == "QSORRES" ~ "Resultado del cuestionario tal cual fue recibido o medido",
+    Variable == "QSSTRESC" ~ "Resultado del cuestionario en formato estándar",
+    Variable == "QSSTRESN"~"Resultado del cuestionario en formato estándar numérico",
+    Variable == "RSSEQ" ~ "Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio RS (Response)",
+    Variable == "RSCAT" ~"Categoría en la que se incluye la respuesta",
+    Variable == "RSTESTCD" ~"Nombre corto del método de medida de la respuesta",
+    Variable == "RSTEST" ~ "Nombre literal del test para medir la respuesta",
+    Variable == "RSORRES" ~ "Medida de la respuesta con las unidades originales con las que fue medido o recibido",
+    Variable == "RSSTRESC" ~ "Resultado de la medida de la respuesta en formato estándar",
+    Variable == "RSDTC" ~ "Fecha de evaluación de la respuesta",
+    Variable == "LSTCNTC" ~ "Fecha de último contacto, no es una variable del CDISC, pero la necesito para la censura",
+    Variable == "SCSEQ" ~ "Secuencia para asegurar la unicidad de cada registro dentro del dominio SC (Subject Characteristics)",
+    Variable == "SCTESTCD" ~ "Código corto del test para medir la característica",
+    Variable == "SCTEST" ~ "Nombre literal del test para medir la característica",
+    Variable == "SCORRES" ~ "Medida de la respuesta tal cual fue medido o recibido",
+    Variable == "SCSTRESC" ~ "Resultado de la medida de la característica en formato estándar",
+    Variable == "TRT01A" ~ "Nombre del tratamiento, en este caso del tratamiento 01A, corresponde a Anticuerpo monoclonal o placebo",
+    Variable == "STRAT1" ~ "Variable de estratificación de los sujetos, en este caso corresponde al APOE4",
+    Variable == "STRAT2" ~"Variable de estratificación de los sujetos, en este caso corresponde a la estratificación dependiente de la puntuacion del minimental",
+    Variable == "PARAMCD" ~"Código del parámetro de análisis, en este caso TTP (tiempo hasta el deterioro sintomático/progresión)",
+    Variable == "ADASBL" ~ "Puntuación del ADAS-Cog",
+    Variable == "MMSEBL" ~ "Puntuación del Minimental",
+    Variable == "SYMPTFL" ~ "Determina presencia o ausencia de deterioro sintomático",
+    Variable == "RFICDT" ~ "Fecha del consentimiento informado",
+    Variable == "PROGDT" ~ "Fecha de progresión/ deterioro sintomático",
+    Variable == "RFPENDT" ~ "Fecha de finalización de participación en el ensayo",
+    Variable == "PARAM" ~ "Descripción del parámetro de análisis, en este caso *Tiempo hasta el Deterioro Sintomático (Días)*",
+    Variable == "STARTDT" ~ "Fecha en la que el sujeto podría tener riesgo de que el evento ocurra, en este caso tomamos como fecha el consentimiento, pues no sabemos la fecha de inicio del tratamiento",
+    Variable == "ADT" ~ "Fecha del evento o la censura asociado",
+    Variable == "AVAL" ~ "Tiempo hasta el evento (deterioro sintomático en este caso) de interés",
+    Variable == "AVALU" ~ "Unidades de AVAL, en este caso DAYS",
+    Variable == "CNSR" ~ "Presencia o ausencia de censura, será 1 si ha completado los 600 días que dura el estudio",
+    Variable == "AVISIT" ~ "Nombre único del encuentro en ADAM",
+    Variable == "AVISITN" ~"Representación numérica de AVISIT",
+    Variable == "ABLFL" ~ "Identifica la situación basal del sujeto",
+    Variable =="BASE" ~ "Valor del parámetro en situación basal",
+    Variable == "CHG" ~ "Cambio desde la situación basal",
+    Variable == "PCHG" ~ "Cambio percentual desde la situación basal",
+    Variable == "ABLFL" ~ "Indica si la medida es de la situación basal, o de otra medida",
+    Variable == "ASTDT" ~ "Fecha de inicio relacionado con el análisis de tiempo hasta el evento",
+    Variable == "AENDT" ~ "Fecha de finalización en el análisis de tiempo hasta el evento",
+    Variable == "ASTDY" ~ "Tiempo desde una fecha referencia (en este caso en la que el sujeto inicia el ensayo) hasta el inicio del evento adverso que le ocurre",
+    Variable == "AENDY" ~ "Tiempo desde una fecha referencia (en este caso en la que el sujeto inicia el ensayo) hasta el fin del evento adverso que le ocurre",
+    Variable == "TRTEMFL" ~ "Define si el evento adverso ha ocurrido tras iniciar el tratamiento (\"Y\")o sucede previamente"
+    
+    
+    )) %>%
+  mutate(Origen = case_when(
+    Variable %in% variables_SDTM ~ "No derivada",
+    Variable == "TRT01A" ~ "Derivada de ARM (DM)",
+    Variable == "STRAT1" ~ "Derivavda de SCSTRESC (dominio SC)",
+    Variable == "STRAT2" ~ "Derivada de FTSTRESN (dominio FT)",
+    Variable == "PARAMCD" ~ "No derivada",
+    Variable == "ADASBL" ~ "Derivada de QSSTRESN (dominio QS)",
+    Variable == "MMSEBL" ~ "Derivada de FTSTRESN (dominio FT)",
+    Variable == "SYMPTFL" ~ "Derivada de RSSTRESC (dominio RS)",
+    Variable == "RFICDT" ~ "Derivada de RFICDTC (dominio DM)",
+    Variable == "PROGDT" ~ "Derivada de RSDTC (dominio RS)",
+    Variable == "RFPENDT" ~ "Derivada de RFPENDTC (Dominio RD)",
+    Variable == "PARAM" ~ "No derivada",
+    Variable == "STARTDT" ~"Derivada de RFICDT (Dominio DM)",
+    Variable == "ADT" ~ "Derivada de PROGDT si hay deterioro y RFPENDT si no lo hay (Tabla ADSL)",
+    Variable == "AVAL" ~ "ADT - STARTDT + 1",
+    Variable == "AVALU" ~ "Dependiente de AVAL",
+    Variable == "CNSR" ~ "Dependiente de SYMPTFL en este caso",
+    Variable == "AVISIT" ~ "Derivada de VISIT (QS/FT)",
+    Variable == "AVISITN" ~ "Dependiente de AVISIT",
+    Variable == "ABLFL" ~"Derivada de AVISIT",
+    Variable == "BASE" ~ "Derivada de AVAL donde ABLFL = \"Y\"",
+    Variable == "CHG"~"AVAL - BASE",
+    Variable == "PCHG" ~ "((AVAL-BASE)/BASE*100)",
+    Variable == "ABLFL" ~ "Derivada de AVISIT",
+    Variable == "ASTDT" ~ "Derivada de AESTDTC",
+    Variable == "AENDT" ~ "Derivada de AEENDTC",
+    Variable == "ASTDY" ~ "ASTDT-RFICDT+1 en este caso",
+    Variable == "AENDY" ~ "ASENDT-RFICDT+1 en este caso",
+    Variable == "TRTEMFL" ~ "Dependiente de ASTDT y de RFICDT"
+    ))
+```
+
+```{r, eval=FALSE}
+fwrite(diccionario_completo,file = "diccionario_variables.tsv",sep = "\t")      
+```
+
+# Limitaciones e imprecisiones
+
+- La variable LSTCNTC de la tabla RS no es una variable aceptada por el CDISC. Lo correcto sería mapearlo como una visita clínica, en nuestro caso es omitible ya que no la derivo siquiera ya que la censura es en relación a si existe o no deterioro sintomático en este caso.
+
+# Bibliografía
+
+1.  van Dyck CH, Swanson CJ, Aisen P, Bateman RJ, Chen C, Gee M, et al. Lecanemab in Early Alzheimer's Disease. N Engl J Med. 2023 Jan 5;388(1):9-21. doi: [10.1056/NEJMoa2212948](https://doi.org/10.1056/NEJMoa2212948).
+
+2.  National Cancer Institute. Common Terminology Criteria for Adverse Events (CTCAE) Version 6.0 \[Internet\]. Bethesda (MD): National Institutes of Health, U.S. Department of Health and Human Services; 2025 \[citado 2026 abr 20\]. Disponible en: [CTCAE v6.0 PDF](https://dctd.cancer.gov/research/ctep-trials/for-sites/adverse-events/ctcae-v6.pdf)
+
+3.  Clinical Data Interchange Standards Consortium (CDISC). Analysis Data Model Implementation Guide (ADaMIG) \[Internet\]. Versión 1.3. Austin, TX: CDISC; 2021 \[citado el 25 de abril de 2026\]. Disponible en: [ADaMIG v1.3](https://www.cdisc.org/standards/foundational/adam/adamig-v1-3)
+
+4.  Clinical Data Interchange Standards Consortium (CDISC). Study Data Tabulation Model Implementation Guide (SDTMIG): Human Clinical Trials \[Internet\]. Versión 3.4. Austin, TX: CDISC; 2021 \[citado el 25 de abril de 2026\]. Disponible en: [SDTMIG v3.4](https://www.cdisc.org/standards/foundational/sdtm/sdtmig-v3-4)
+
+
+# Diccionario de variables
+```{r}
+kable(diccionario_completo)
+```
+
+# Declaración de uso de la IA
+
+Se ha usado Gemini 2.5 Pro y los modelo de Claude Haiku 4.5, Sonnet 4.5 para realizar el código, entender las variables y los formatos estándar.

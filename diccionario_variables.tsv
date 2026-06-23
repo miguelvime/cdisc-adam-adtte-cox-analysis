@@ -1,0 +1,139 @@
+Dataset	Variable	Significado	Clase	Origen
+DM	STUDYID	Identificador único del estudio	character	No derivada
+DM	DOMAIN	Conjunto de observaciones con un tema específico	character	No derivada
+DM	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+DM	SUBJID	Identificador del sujeto dentro de un ensayo	character	No derivada
+DM	SITEID	Identificador del lugar donde se realiza el estudio	character	No derivada
+DM	AGE	Edad del sujeto estudiado	integer	No derivada
+DM	AGEU	Unidades en las que se expresa la unidad del sujeto p.e. años	character	No derivada
+DM	SEX	Sexo del sujeto estudiado	character	No derivada
+DM	ARM	Nombre del grupo experimental al que pertenece el sujeto	character	No derivada
+DM	RFICDTC	Fecha de la firma del consentimiento informado	character	No derivada
+DM	RFPENDTC	Fecha de fin de la participación en el ensayo para el sujeto	character	No derivada
+AE	STUDYID	Identificador único del estudio	character	No derivada
+AE	DOMAIN	Conjunto de observaciones con un tema específico	character	No derivada
+AE	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+AE	AESEQ	Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio AE (Adverse Events)	integer	No derivada
+AE	AETERM	Nombre del evento adverso reportado	character	No derivada
+AE	AEDECOD	Nombre estandarizado del evento adverso reportado	character	No derivada
+AE	AESEV	Intensidad/severidad del evento adverso reportado	numeric	No derivada
+AE	AESTDTC	Fecha de inicio del evento adverso reportado	character	No derivada
+AE	AEENDTC	Fecha fin del evento reportado	character	No derivada
+FT	STUDYID	Identificador único del estudio	character	No derivada
+FT	DOMAIN	Conjunto de observaciones con un tema específico	character	No derivada
+FT	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+FT	FTSEQ	Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio FT (Functional Tests)	integer	No derivada
+FT	FTCAT	Categoría en la que se incluye el test funcional	character	No derivada
+FT	FTTESTCD	Nombre corto del test	character	No derivada
+FT	FTTEST	Nombre literal del test	character	No derivada
+FT	FTORRES	Resultado del test tal cual fue recibido o medido	character	No derivada
+FT	FTSTRESC	Resultado del test en formato estándar	character	No derivada
+FT	FTSTRESN	Resultado del test en formato estándar numérico	numeric	No derivada
+FT	VISITNUM	Numero asignado a un encuentro clínico	numeric	No derivada
+FT	VISIT	Nombre del encuentro clínico	character	No derivada
+QS	STUDYID	Identificador único del estudio	character	No derivada
+QS	DOMAIN	Conjunto de observaciones con un tema específico	character	No derivada
+QS	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+QS	QSSEQ	Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio QS (Questionnaires)	integer	No derivada
+QS	QSCAT	Categoría en la que se incluye el cuestionario	character	No derivada
+QS	QSTESTCD	Nombre corto del cuestionario	character	No derivada
+QS	QSTEST	Nombre literal del cuestionario	character	No derivada
+QS	QSORRES	Resultado del cuestionario tal cual fue recibido o medido	character	No derivada
+QS	QSSTRESC	Resultado del cuestionario en formato estándar	character	No derivada
+QS	QSSTRESN	Resultado del cuestionario en formato estándar numérico	numeric	No derivada
+QS	VISITNUM	Numero asignado a un encuentro clínico	numeric	No derivada
+QS	VISIT	Nombre del encuentro clínico	character	No derivada
+RS	STUDYID	Identificador único del estudio	character	No derivada
+RS	DOMAIN	Conjunto de observaciones con un tema específico	character	No derivada
+RS	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+RS	RSSEQ	Números de una secuencia para asegurar la unicidad de cada registro dentro del dominio RS (Response)	integer	No derivada
+RS	RSCAT	Categoría en la que se incluye la respuesta	character	No derivada
+RS	RSTESTCD	Nombre corto del método de medida de la respuesta	character	No derivada
+RS	RSTEST	Nombre literal del test para medir la respuesta	character	No derivada
+RS	RSORRES	Medida de la respuesta con las unidades originales con las que fue medido o recibido	character	No derivada
+RS	RSSTRESC	Resultado de la medida de la respuesta en formato estándar	character	No derivada
+RS	RSDTC	Fecha de evaluación de la respuesta	character	No derivada
+RS	LSTCNTC	Fecha de último contacto, no es una variable del CDISC, pero la necesito para la censura	character	No derivada
+SC	STUDYID	Identificador único del estudio	character	No derivada
+SC	DOMAIN	Conjunto de observaciones con un tema específico	character	No derivada
+SC	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+SC	SCSEQ	Secuencia para asegurar la unicidad de cada registro dentro del dominio SC (Subject Characteristics)	integer	No derivada
+SC	SCTESTCD	Código corto del test para medir la característica	character	No derivada
+SC	SCTEST	Nombre literal del test para medir la característica	character	No derivada
+SC	SCORRES	Medida de la respuesta tal cual fue medido o recibido	character	No derivada
+SC	SCSTRESC	Resultado de la medida de la característica en formato estándar	character	No derivada
+ADSL	STUDYID	Identificador único del estudio	character	No derivada
+ADSL	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+ADSL	SUBJID	Identificador del sujeto dentro de un ensayo	character	No derivada
+ADSL	SITEID	Identificador del lugar donde se realiza el estudio	character	No derivada
+ADSL	AGE	Edad del sujeto estudiado	integer	No derivada
+ADSL	SEX	Sexo del sujeto estudiado	character	No derivada
+ADSL	TRT01A	Nombre del tratamiento, en este caso del tratamiento 01A, corresponde a Anticuerpo monoclonal o placebo	character	Derivada de ARM (DM)
+ADSL	STRAT1	Variable de estratificación de los sujetos, en este caso corresponde al APOE4	character	Derivavda de SCSTRESC (dominio SC)
+ADSL	ADASBL	Puntuación del ADAS-Cog	numeric	Derivada de QSSTRESN (dominio QS)
+ADSL	MMSEBL	Puntuación del Minimental	numeric	Derivada de FTSTRESN (dominio FT)
+ADSL	STRAT2	Variable de estratificación de los sujetos, en este caso corresponde a la estratificación dependiente de la puntuacion del minimental	character	Derivada de FTSTRESN (dominio FT)
+ADSL	SYMPTFL	Determina presencia o ausencia de deterioro sintomático	character	Derivada de RSSTRESC (dominio RS)
+ADSL	RFICDT	Fecha del consentimiento informado	Date	Derivada de RFICDTC (dominio DM)
+ADSL	PROGDT	Fecha de progresión/ deterioro sintomático	Date	Derivada de RSDTC (dominio RS)
+ADSL	RFPENDT	Fecha de finalización de participación en el ensayo	Date	Derivada de RFPENDTC (Dominio RD)
+ADTTE	STUDYID	Identificador único del estudio	character	No derivada
+ADTTE	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+ADTTE	TRT01A	Nombre del tratamiento, en este caso del tratamiento 01A, corresponde a Anticuerpo monoclonal o placebo	character	Derivada de ARM (DM)
+ADTTE	STRAT1	Variable de estratificación de los sujetos, en este caso corresponde al APOE4	character	Derivavda de SCSTRESC (dominio SC)
+ADTTE	STRAT2	Variable de estratificación de los sujetos, en este caso corresponde a la estratificación dependiente de la puntuacion del minimental	character	Derivada de FTSTRESN (dominio FT)
+ADTTE	PARAMCD	Código del parámetro de análisis, en este caso TTP (tiempo hasta el deterioro sintomático/progresión)	character	No derivada
+ADTTE	PARAM	Descripción del parámetro de análisis, en este caso *Tiempo hasta el Deterioro Sintomático (Días)*	character	No derivada
+ADTTE	STARTDT	Fecha en la que el sujeto podría tener riesgo de que el evento ocurra, en este caso tomamos como fecha el consentimiento, pues no sabemos la fecha de inicio del tratamiento	Date	Derivada de RFICDT (Dominio DM)
+ADTTE	ADT	Fecha del evento o la censura asociado	Date	Derivada de PROGDT si hay deterioro y RFPENDT si no lo hay (Tabla ADSL)
+ADTTE	AVAL	Tiempo hasta el evento (deterioro sintomático en este caso) de interés	numeric	ADT - STARTDT + 1
+ADTTE	AVALU	Unidades de AVAL, en este caso DAYS	character	Dependiente de AVAL
+ADTTE	CNSR	Presencia o ausencia de censura, será 1 si ha completado los 600 días que dura el estudio	numeric	Dependiente de SYMPTFL en este caso
+ADQS	STUDYID	Identificador único del estudio	character	No derivada
+ADQS	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+ADQS	SITEID	Identificador del lugar donde se realiza el estudio	character	No derivada
+ADQS	AGE	Edad del sujeto estudiado	integer	No derivada
+ADQS	SEX	Sexo del sujeto estudiado	character	No derivada
+ADQS	TRT01A	Nombre del tratamiento, en este caso del tratamiento 01A, corresponde a Anticuerpo monoclonal o placebo	character	Derivada de ARM (DM)
+ADQS	STRAT1	Variable de estratificación de los sujetos, en este caso corresponde al APOE4	character	Derivavda de SCSTRESC (dominio SC)
+ADQS	STRAT2	Variable de estratificación de los sujetos, en este caso corresponde a la estratificación dependiente de la puntuacion del minimental	character	Derivada de FTSTRESN (dominio FT)
+ADQS	PARAMCD	Código del parámetro de análisis, en este caso TTP (tiempo hasta el deterioro sintomático/progresión)	character	No derivada
+ADQS	PARAM	Descripción del parámetro de análisis, en este caso *Tiempo hasta el Deterioro Sintomático (Días)*	character	No derivada
+ADQS	AVISIT	Nombre único del encuentro en ADAM	character	Derivada de VISIT (QS/FT)
+ADQS	AVISITN	Representación numérica de AVISIT	numeric	Dependiente de AVISIT
+ADQS	AVAL	Tiempo hasta el evento (deterioro sintomático en este caso) de interés	numeric	ADT - STARTDT + 1
+ADQS	ABLFL	Identifica la situación basal del sujeto	character	Derivada de AVISIT
+ADQS	BASE	Valor del parámetro en situación basal	numeric	"Derivada de AVAL donde ABLFL = ""Y"""
+ADQS	CHG	Cambio desde la situación basal	numeric	AVAL - BASE
+ADQS	PCHG	Cambio percentual desde la situación basal	numeric	((AVAL-BASE)/BASE*100)
+ADFT	STUDYID	Identificador único del estudio	character	No derivada
+ADFT	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+ADFT	SITEID	Identificador del lugar donde se realiza el estudio	character	No derivada
+ADFT	AGE	Edad del sujeto estudiado	integer	No derivada
+ADFT	SEX	Sexo del sujeto estudiado	character	No derivada
+ADFT	TRT01A	Nombre del tratamiento, en este caso del tratamiento 01A, corresponde a Anticuerpo monoclonal o placebo	character	Derivada de ARM (DM)
+ADFT	STRAT1	Variable de estratificación de los sujetos, en este caso corresponde al APOE4	character	Derivavda de SCSTRESC (dominio SC)
+ADFT	STRAT2	Variable de estratificación de los sujetos, en este caso corresponde a la estratificación dependiente de la puntuacion del minimental	character	Derivada de FTSTRESN (dominio FT)
+ADFT	PARAMCD	Código del parámetro de análisis, en este caso TTP (tiempo hasta el deterioro sintomático/progresión)	character	No derivada
+ADFT	PARAM	Descripción del parámetro de análisis, en este caso *Tiempo hasta el Deterioro Sintomático (Días)*	character	No derivada
+ADFT	AVISIT	Nombre único del encuentro en ADAM	character	Derivada de VISIT (QS/FT)
+ADFT	AVISITN	Representación numérica de AVISIT	numeric	Dependiente de AVISIT
+ADFT	AVAL	Tiempo hasta el evento (deterioro sintomático en este caso) de interés	numeric	ADT - STARTDT + 1
+ADFT	ABLFL	Identifica la situación basal del sujeto	character	Derivada de AVISIT
+ADFT	BASE	Valor del parámetro en situación basal	numeric	"Derivada de AVAL donde ABLFL = ""Y"""
+ADFT	CHG	Cambio desde la situación basal	numeric	AVAL - BASE
+ADFT	PCHG	Cambio percentual desde la situación basal	numeric	((AVAL-BASE)/BASE*100)
+ADAE	STUDYID	Identificador único del estudio	character	No derivada
+ADAE	USUBJID	Identificador único del sujeto, en el ensayo y entre ensayos	character	No derivada
+ADAE	SITEID	Identificador del lugar donde se realiza el estudio	character	No derivada
+ADAE	AGE	Edad del sujeto estudiado	integer	No derivada
+ADAE	SEX	Sexo del sujeto estudiado	character	No derivada
+ADAE	TRT01A	Nombre del tratamiento, en este caso del tratamiento 01A, corresponde a Anticuerpo monoclonal o placebo	character	Derivada de ARM (DM)
+ADAE	AETERM	Nombre del evento adverso reportado	character	No derivada
+ADAE	AEDECOD	Nombre estandarizado del evento adverso reportado	character	No derivada
+ADAE	AESEV	Intensidad/severidad del evento adverso reportado	numeric	No derivada
+ADAE	ASTDT	Fecha de inicio relacionado con el análisis de tiempo hasta el evento	Date	Derivada de AESTDTC
+ADAE	AENDT	Fecha de finalización en el análisis de tiempo hasta el evento	Date	Derivada de AEENDTC
+ADAE	ASTDY	Tiempo desde una fecha referencia (en este caso en la que el sujeto inicia el ensayo) hasta el inicio del evento adverso que le ocurre	numeric	ASTDT-RFICDT+1 en este caso
+ADAE	AENDY	Tiempo desde una fecha referencia (en este caso en la que el sujeto inicia el ensayo) hasta el fin del evento adverso que le ocurre	numeric	ASENDT-RFICDT+1 en este caso
+ADAE	TRTEMFL	"Define si el evento adverso ha ocurrido tras iniciar el tratamiento (""Y"")o sucede previamente"	character	Dependiente de ASTDT y de RFICDT
