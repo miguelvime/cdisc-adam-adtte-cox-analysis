@@ -16,10 +16,11 @@ set.seed(202)
 library(haven)
 library(gtsummary)
 library(tidyverse)
-
+library(patchwork)
+library(scales)
 ```
 
-Cargar los datos de ADAM
+# Cargar los datos de ADAM
 ```{r}
 adae<-read_xpt("./results/adae.xpt")
 adft<-read_xpt("./results/adft.xpt")
@@ -30,7 +31,7 @@ ae <- read_xpt("./results/ae.xpt")
 n <- 300
 ```
 
-Diferencias en efectos adversos por rama de tratamiento
+# Diferencias en frecuencia de ea por rama de tratamiento
  
 ```{r}
 descriptive_ae <- left_join(adsl |> select(USUBJID,TRT01A,SEX), adae |> select(USUBJID, AETERM, AESEV), by = "USUBJID") 
@@ -51,6 +52,7 @@ descriptive_ae_clean <- descriptive_ae |>
         AESEV = factor(AESEV, levels = c("No efecto adverso", "Leve", "Moderado", "Grave", "Muy grave")),
         AETERM = if_else(AETERM == "reaccion infusional", "Reaccion infusional", AETERM),
         AETERM = factor(AETERM, levels = c("No efecto adverso", "Reaccion infusional", "Cefalea", "Caida", "ARIA-E", "ARIA-H")),
+        SEX = factor(SEX, levels = c("M", "F"), labels = c("Hombre", "Mujer"))
         ) |> 
     select(-USUBJID) |> 
     select(General, SEX, TRT01A,AETERM, AESEV) 
@@ -63,25 +65,94 @@ frequency_analysis_table <- descriptive_ae_clean |>
 frequency_analysis_table
 ```
 
-Gráficos de efectos adversos por rama de tratamiento, en este caso la tabla es suficientemente informativa.
 
 ```{r}
-ea_plot_data <- descriptive_ae_clean |> 
-  group_by(TRT01A) |> 
-  summarise(
-    n_grupo = n(),
-    n_ea = sum(General == "Efecto adverso"),
-    proporcion = (n_ea / n_grupo) * 100
-  )
+n_por_brazo <- data.frame(
+  TRT01A = c("Anticuerpo Monoclonal", "Placebo"),
+  n_total = c(167, 133) 
+)
 
-ggplot(ea_plot_data, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
-  geom_bar(stat = "identity") +
-  labs(title = "Proporción de efectos adversos por rama de tratamiento",
-       x = "Rama de tratamiento",
-       y = "Proporción de efectos adversos (%)") +
-  theme_minimal() +
+ea_plot_general_data <- descriptive_ae_clean |>
+  filter(General == "Efecto adverso") |>
+  group_by(TRT01A) |>
+  summarise(n_ea = n(), .groups = "drop") |>
+  left_join(n_por_brazo, by = "TRT01A") |>
+  mutate(proporcion = (n_ea / n_total))
+
+n_by_trt <- adsl |> count(TRT01A, name = "n_total")
+n_by_trt_sex <- adsl |>
+  mutate(SEX = factor(SEX, levels = c("M","F"), labels = c("Hombre","Mujer"))) |>
+  count(TRT01A, SEX, name = "n_total")
+
+ae_counts <- descriptive_ae |>
+  mutate(
+    AETERM = replace_na(AETERM, "No efecto adverso"),
+    AESEV = replace_na(AESEV, 0),
+    AESEV = case_when(
+      AESEV == 0 ~ "No efecto adverso",
+      AESEV == 1 ~ "Leve",
+      AESEV == 2 ~ "Moderado",
+      AESEV == 3 ~ "Grave",
+      AESEV == 4 ~ "Muy grave"
+    ),
+    AETERM = if_else(AETERM == "reaccion infusional", "Reaccion infusional", AETERM),
+    SEX = factor(SEX, levels = c("M","F"), labels = c("Hombre","Mujer"))
+  ) |>
+  filter(AETERM != "No efecto adverso") |>
+  group_by(TRT01A, SEX, AETERM, AESEV) |>
+  summarise(n_ea = n_distinct(USUBJID), .groups = "drop")
+
+
+ea_term <- ae_counts |>
+  group_by(TRT01A, AETERM) |>
+  summarise(n_ea = sum(n_ea), .groups = "drop") |>
+  left_join(n_by_trt, by = "TRT01A") |>
+  mutate(proporcion = n_ea / n_total)
+
+ea_sex <- ae_counts |>
+  group_by(TRT01A, SEX) |>
+  summarise(n_ea = sum(n_ea), .groups = "drop") |>
+  left_join(n_by_trt_sex, by = c("TRT01A", "SEX")) |>
+  mutate(proporcion = n_ea / n_total)
+
+ea_severity <- ae_counts |>
+  group_by(TRT01A, AESEV) |>
+  summarise(n_ea = sum(n_ea), .groups = "drop") |>
+  left_join(n_by_trt, by = "TRT01A") |>
+  mutate(proporcion = n_ea / n_total)
+
+
+ymax <- min(1, max(c(ea_plot_general_data$proporcion, ea_term$proporcion, ea_sex$proporcion, ea_severity$proporcion), na.rm = TRUE) * 1.05)
+
+plot_general <- ggplot(ea_plot_general_data, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+  geom_col() +
+  labs(title = "General  p < 0,05", x = NULL, y = "Porcentaje de efectos adversos") +
+  scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
+  scale_fill_manual(name = NULL, values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
+  theme(text = element_text(face = "bold"), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+
+plot_por_ea <- ggplot(ea_term, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+  geom_col(show.legend = FALSE) + facet_wrap(~ AETERM) + scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
   scale_fill_manual(values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
-  theme(legend.position = "none")
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), plot.title = element_text(face = "bold"), axis.title = element_blank(), legend.position = "none") +
+  labs(title = "Efecto adverso")
+
+plot_por_sex <- ggplot(ea_sex, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+  geom_col(show.legend = FALSE) + facet_wrap(~ SEX) + scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
+  scale_fill_manual(values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), plot.title = element_text(face = "bold"), axis.title = element_blank(), legend.position = "none") +
+  labs(title = "Sexo")
+
+plot_por_severidad <- ggplot(ea_severity, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+  geom_col(show.legend = FALSE) + facet_wrap(~ AESEV) + scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
+  scale_fill_manual(values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), plot.title = element_text(face = "bold"), axis.title = element_blank(), legend.position = "none") +
+  labs(title = "Severidad")
+
+final_plot <- (plot_general + plot_por_ea) / (plot_por_sex + plot_por_severidad) +
+  plot_layout(guides = "collect") & theme(legend.position = "bottom")
+
+final_plot
 
 ```
 
