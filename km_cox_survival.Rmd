@@ -6,3 +6,57 @@ toc: true
 knit: pdf_document
 ---
 
+```{r}
+set.seed(202)
+```
+
+# Librerías
+
+```{r}
+library(haven)
+library(gtsummary)
+library(tidyverse)
+
+```
+
+Cargar los datos de ADAM
+```{r}
+adae<-read_xpt("./results/adae.xpt")
+adft<-read_xpt("./results/adft.xpt")
+adqs<-read_xpt("./results/adqs.xpt")
+adsl<-read_xpt("./results/adsl.xpt")
+adtte<-read_xpt("./results/adtte.xpt")
+ae <- read_xpt("./results/ae.xpt")
+n <- 300
+```
+
+Diferencias en efectos adversos por rama de tratamiento
+ 
+```{r}
+descriptive_ae <- left_join(adsl |> select(USUBJID,TRT01A,SEX), adae |> select(USUBJID, AETERM, AESEV), by = "USUBJID") 
+
+descriptive_ae_clean <- descriptive_ae |> 
+    mutate(
+        AETERM = replace_na(AETERM, "No efecto adverso"),
+        AESEV = replace_na (AESEV,0),
+        Overall = case_when(
+            AESEV == 0 ~ "No Efecto adverso",
+            AESEV > 0 ~ "Efecto adverso"),
+        AESEV = case_when(
+            AESEV == 0 ~ "No efecto adverso",
+            AESEV == 1 ~ "Leve",
+            AESEV == 2 ~ "Moderado",
+            AESEV == 3 ~ "Grave",
+            AESEV == 4 ~ "Muy grave"),
+        AESEV = factor(AESEV, levels = c("No efecto adverso", "Leve", "Moderado", "Grave", "Muy grave")),
+        AETERM = if_else(AETERM == "reaccion infusional", "Reaccion infusional", AETERM),
+        AETERM = factor(AETERM, levels = c("No efecto adverso", "Reaccion infusional", "Cefalea", "Caida", "ARIA-E", "ARIA-H")),
+        ) |> 
+    select(-USUBJID) |> 
+    select(Overall, SEX, TRT01A,AETERM, AESEV) |> 
+    tbl_summary(by = TRT01A, missing = "no", label = list(AETERM ~ "Efecto adverso", AESEV ~ "Severidad")) |> 
+    bold_labels() |> 
+    add_p() 
+   
+descriptive_ae_clean
+```
