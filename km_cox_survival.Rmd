@@ -39,7 +39,7 @@ descriptive_ae_clean <- descriptive_ae |>
     mutate(
         AETERM = replace_na(AETERM, "No efecto adverso"),
         AESEV = replace_na (AESEV,0),
-        Overall = case_when(
+        General = case_when(
             AESEV == 0 ~ "No Efecto adverso",
             AESEV > 0 ~ "Efecto adverso"),
         AESEV = case_when(
@@ -53,10 +53,35 @@ descriptive_ae_clean <- descriptive_ae |>
         AETERM = factor(AETERM, levels = c("No efecto adverso", "Reaccion infusional", "Cefalea", "Caida", "ARIA-E", "ARIA-H")),
         ) |> 
     select(-USUBJID) |> 
-    select(Overall, SEX, TRT01A,AETERM, AESEV) |> 
-    tbl_summary(by = TRT01A, missing = "no", label = list(AETERM ~ "Efecto adverso", AESEV ~ "Severidad")) |> 
+    select(General, SEX, TRT01A,AETERM, AESEV) 
+     
+frequency_analysis_table <- descriptive_ae_clean |> 
+    tbl_summary(by = TRT01A, missing = "no", label = list(AETERM ~ "Efecto adverso", AESEV ~ "Severidad", SEX ~"Sexo")) |> 
     bold_labels() |> 
     add_p() 
    
-descriptive_ae_clean
+frequency_analysis_table
 ```
+
+Gráficos de efectos adversos por rama de tratamiento, en este caso la tabla es suficientemente informativa.
+
+```{r}
+ea_plot_data <- descriptive_ae_clean |> 
+  group_by(TRT01A) |> 
+  summarise(
+    n_grupo = n(),
+    n_ea = sum(General == "Efecto adverso"),
+    proporcion = (n_ea / n_grupo) * 100
+  )
+
+ggplot(ea_plot_data, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Proporción de efectos adversos por rama de tratamiento",
+       x = "Rama de tratamiento",
+       y = "Proporción de efectos adversos (%)") +
+  theme_minimal() +
+  scale_fill_manual(values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
+  theme(legend.position = "none")
+
+```
+
