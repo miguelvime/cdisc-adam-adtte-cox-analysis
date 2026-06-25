@@ -12,7 +12,7 @@ set.seed(202)
 
 # Librerías
 
-```{r, warnings = FALSE}
+```{r, warning = FALSE, message = FALSE}
 library(haven)
 library(gtsummary)
 library(tidyverse)
@@ -29,7 +29,7 @@ adsl<-read_xpt("./results/adsl.xpt")
 adtte<-read_xpt("./results/adtte.xpt")
 ```
 
-# Diferencias en frecuencia de ea por rama de tratamiento
+# Diferencias en frecuencia de eventos adversos por rama de tratamiento
  
 ```{r}
 descriptive_ae <- left_join(adsl |> select(USUBJID,TRT01A,SEX), adae |> select(USUBJID, AETERM, AESEV), by = "USUBJID") 
@@ -52,16 +52,61 @@ descriptive_ae_clean <- descriptive_ae |>
         AETERM = factor(AETERM, levels = c("No efecto adverso", "Reaccion infusional", "Cefalea", "Caida", "ARIA-E", "ARIA-H")),
         SEX = factor(SEX, levels = c("M", "F"), labels = c("Hombre", "Mujer"))
         ) |> 
-    select(-USUBJID) |> 
-    select(General, SEX, TRT01A,AETERM, AESEV) 
-     
-frequency_analysis_table <- descriptive_ae_clean |> 
-    tbl_summary(by = TRT01A, missing = "no", label = list(AETERM ~ "Efecto adverso", AESEV ~ "Severidad", SEX ~"Sexo")) |> 
-    bold_labels() |> 
+    #select(-USUBJID) |> 
+    select(USUBJID,General, SEX, TRT01A,AETERM, AESEV) 
+ 
+```
+
+```{r}
+aeterm_indicators <- descriptive_ae_clean |>
+  distinct(USUBJID, TRT01A, SEX, AETERM) |>
+  mutate(value = 1) |>
+  pivot_wider(
+    id_cols = c(USUBJID, TRT01A, SEX),
+    names_from = AETERM,
+    values_from = value,
+    values_fill = 0,
+  )
+
+aesev_indicators <- descriptive_ae_clean |> 
+  distinct(USUBJID,TRT01A,SEX,AESEV) |> 
+  mutate(value = 1) |> 
+  pivot_wider(
+    id_cols = c(USUBJID,TRT01A,SEX),
+    names_from = AESEV,
+    values_from = value,
+    values_fill = 0,
+  )
+
+gc()
+aeterm_frequency_analysis_table <- aeterm_indicators |>
+  select(-USUBJID, -SEX) |> 
+  tbl_summary(by = TRT01A) |> 
+  add_p()
+
+aesev_frequency_analysis_table<- aesev_indicators |> 
+  select(-USUBJID, -SEX) |> 
+  tbl_summary(by=TRT01A) |> 
+  add_p()
+
+```
+
+```{r}
+sex_general_frequency_analysis_table <- descriptive_ae_clean |>
+    select(-USUBJID, -AETERM, -AESEV) |> 
+    tbl_summary(by = TRT01A, missing = "no", label = list(SEX ~"Sexo")) |> 
     add_p() 
    
-frequency_analysis_table
+sex_general_frequency_analysis_table
+
+combined_table <- tbl_stack(
+  list(sex_general_frequency_analysis_table,aeterm_frequency_analysis_table, aesev_frequency_analysis_table),
+  group_header = c("","Efecto adverso","Severidad"))
+
+combined_table
 ```
+
+Globalmente el número de eventos adversos tiene diferencias estadísticamente significativas entre los grupos. En concreto la frecuencia de la cefalea es significativamente distinta en el grupo control y en el de tratamiento. No se observan diferencias significativas de frecuencia de eventos adversos por sexo, por gravedad o por otros efectos adversos como reacción infusional, ARIA-H o ARIA-E.
 
 ## Plot 
 
@@ -71,7 +116,7 @@ n_por_brazo <- data.frame(
   n_total = c(167, 133) 
 )
 
-ea_plot_general_data <- descriptive_ae_clean |>
+ae_plot_data <- descriptive_ae_clean |>
   filter(General == "Efecto adverso") |>
   group_by(TRT01A) |>
   summarise(n_ea = n(), .groups = "drop") |>
@@ -95,6 +140,7 @@ ae_counts <- descriptive_ae |>
       AESEV == 4 ~ "Muy grave"
     ),
     AETERM = if_else(AETERM == "reaccion infusional", "Reaccion infusional", AETERM),
+    AETERM =if_else(AETERM == "Cefalea", "Cefalea p<0.05*", AETERM),
     SEX = factor(SEX, levels = c("M","F"), labels = c("Hombre","Mujer"))
   ) |>
   filter(AETERM != "No efecto adverso") |>
@@ -102,47 +148,47 @@ ae_counts <- descriptive_ae |>
   summarise(n_ea = n_distinct(USUBJID), .groups = "drop")
 
 
-ea_term <- ae_counts |>
+ae_term <- ae_counts |>
   group_by(TRT01A, AETERM) |>
   summarise(n_ea = sum(n_ea), .groups = "drop") |>
   left_join(n_by_trt, by = "TRT01A") |>
-  mutate(proporcion = n_ea / n_total)
+  mutate(proporcion = n_ea / n_total) 
 
-ea_sex <- ae_counts |>
+ae_sex <- ae_counts |>
   group_by(TRT01A, SEX) |>
   summarise(n_ea = sum(n_ea), .groups = "drop") |>
   left_join(n_by_trt_sex, by = c("TRT01A", "SEX")) |>
   mutate(proporcion = n_ea / n_total)
 
-ea_severity <- ae_counts |>
+ae_severity <- ae_counts |>
   group_by(TRT01A, AESEV) |>
   summarise(n_ea = sum(n_ea), .groups = "drop") |>
   left_join(n_by_trt, by = "TRT01A") |>
   mutate(proporcion = n_ea / n_total)
 
 
-ymax <- min(1, max(c(ea_plot_general_data$proporcion, ea_term$proporcion, ea_sex$proporcion, ea_severity$proporcion), na.rm = TRUE) * 1.05)
+ymax <- min(1, max(c(ae_plot_data$proporcion, ae_term$proporcion, ae_sex$proporcion, ae_severity$proporcion), na.rm = TRUE) * 1.05)
 
-plot_general <- ggplot(ea_plot_general_data, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+plot_general <- ggplot(ae_plot_data, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
   geom_col() +
-  labs(title = "General  p < 0,05", x = NULL, y = "Porcentaje de efectos adversos") +
+  labs(title = "General  p < 0,05", x = NULL, y = "Efectos adversos") +
   scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
   scale_fill_manual(name = NULL, values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
-  theme(text = element_text(face = "bold"), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+  theme(text = element_text(face = "bold"),axis.text.x = element_blank(), axis.ticks.x = element_blank())
 
-plot_por_ea <- ggplot(ea_term, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+plot_por_ea <- ggplot(ae_term, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
   geom_col(show.legend = FALSE) + facet_wrap(~ AETERM) + scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
   scale_fill_manual(values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), plot.title = element_text(face = "bold"), axis.title = element_blank(), legend.position = "none") +
   labs(title = "Efecto adverso")
 
-plot_por_sex <- ggplot(ea_sex, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+plot_por_sex <- ggplot(ae_sex, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
   geom_col(show.legend = FALSE) + facet_wrap(~ SEX) + scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
   scale_fill_manual(values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), plot.title = element_text(face = "bold"), axis.title = element_blank(), legend.position = "none") +
   labs(title = "Sexo")
 
-plot_por_severidad <- ggplot(ea_severity, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
+plot_por_severidad <- ggplot(ae_severity, aes(x = TRT01A, y = proporcion, fill = TRT01A)) +
   geom_col(show.legend = FALSE) + facet_wrap(~ AESEV) + scale_y_continuous(labels = percent_format(accuracy = 1), limits = c(0, ymax), expand = expansion(mult = c(0, 0.02))) +
   scale_fill_manual(values = c("Anticuerpo Monoclonal" = "#1f77b4", "Placebo" = "#d97115")) +
   theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), plot.title = element_text(face = "bold"), axis.title = element_blank(), legend.position = "none") +
@@ -156,3 +202,4 @@ final_plot
 ```
 
 # Análisis de supervivencia: curvas Kaplan-Meier
+
