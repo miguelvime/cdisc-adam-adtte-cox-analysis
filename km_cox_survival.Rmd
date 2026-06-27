@@ -4,6 +4,8 @@ author: "Miguel Angel Vicente Mesonero"
 date: "2026-04-14"
 toc: true
 knit: pdf_document
+bibliography: references.bib
+csl: "vancouver"
 ---
 
 ```{r}
@@ -18,15 +20,18 @@ library(gtsummary)
 library(tidyverse)
 library(patchwork)
 library(scales)
+library(survival)
+library(ggsurvfit)
 ```
 
 # Cargar los datos de ADAM
 ```{r}
 adae<-read_xpt("./results/adae.xpt")
-adft<-read_xpt("./results/adft.xpt")
-adqs<-read_xpt("./results/adqs.xpt")
 adsl<-read_xpt("./results/adsl.xpt")
 adtte<-read_xpt("./results/adtte.xpt")
+adft <- read_xpt("./results/adft.xpt")
+adqs<-read_xpt("./results/adqs.xpt")
+
 ```
 
 # Diferencias en frecuencia de eventos adversos por rama de tratamiento
@@ -52,12 +57,8 @@ descriptive_ae_clean <- descriptive_ae |>
         AETERM = factor(AETERM, levels = c("No efecto adverso", "Reaccion infusional", "Cefalea", "Caida", "ARIA-E", "ARIA-H")),
         SEX = factor(SEX, levels = c("M", "F"), labels = c("Hombre", "Mujer"))
         ) |> 
-    #select(-USUBJID) |> 
     select(USUBJID,General, SEX, TRT01A,AETERM, AESEV) 
  
-```
-
-```{r}
 aeterm_indicators <- descriptive_ae_clean |>
   distinct(USUBJID, TRT01A, SEX, AETERM) |>
   mutate(value = 1) |>
@@ -77,8 +78,6 @@ aesev_indicators <- descriptive_ae_clean |>
     values_from = value,
     values_fill = 0,
   )
-
-gc()
 aeterm_frequency_analysis_table <- aeterm_indicators |>
   select(-USUBJID, -SEX) |> 
   tbl_summary(by = TRT01A) |> 
@@ -89,15 +88,10 @@ aesev_frequency_analysis_table<- aesev_indicators |>
   tbl_summary(by=TRT01A) |> 
   add_p()
 
-```
-
-```{r}
 sex_general_frequency_analysis_table <- descriptive_ae_clean |>
     select(-USUBJID, -AETERM, -AESEV) |> 
     tbl_summary(by = TRT01A, missing = "no", label = list(SEX ~"Sexo")) |> 
     add_p() 
-   
-sex_general_frequency_analysis_table
 
 combined_table <- tbl_stack(
   list(sex_general_frequency_analysis_table,aeterm_frequency_analysis_table, aesev_frequency_analysis_table),
@@ -203,3 +197,116 @@ final_plot
 
 # Análisis de supervivencia: curvas Kaplan-Meier
 
+El endpoint de nuestro ensayo será Progression Free Survival pues medimos Tiempo hasta el Deterioro Sintomático (Días) como vemos en:
+
+```{r}
+unique(adtte$PARAM)
+```
+```{r}
+survival_curves<-survfit2(Surv(AVAL,1-CNSR)~TRT01A, data = adtte)
+
+plot_survival<- ggsurvfit(survival_curves) +
+  add_confidence_interval() +
+  add_risktable(
+    risktable_stats = "n.risk",
+    risktable_height = 0.33,
+    size = 4) +
+  add_risktable_strata_symbol(symbol = "\U25CF",size =10) +
+  add_pvalue(location = "annotation", caption = "{p.value}") +
+  add_censor_mark() +
+  scale_ggsurvfit() +
+  add_quantile() +
+  labs(
+    title = "Kaplan-Meier - Overall Survival",
+    subtitle = "AD-01",
+    x = "Días",
+    y = "Probabilidad de supervivencia"
+  )
+plot_survival
+```
+
+# Método de filtrado "forward" por p-valor
+
+En este método se realizan modelos univariables, de esta manera se eligen aquellas variables cuyo valor de p sea menor que un umbral predefinido (p< 0.1 en este caso). Esto es un enfoque 'forward', en el que se van añadiendo variables a un modelos según su significancia.
+
+Según [@heinzeFiveMythsVariable2017]: "Aunque es cierto que los coeficientes de regresión suelen ser mayores en modelos univariables que en multivariables, lo contrario puede también suceder". "El prefiltrado univariable no es un prerrequisito ni añade ningún beneficio al construir modelos multivariable".
+
+El problema de este método es que no controla por variables de confusión, por lo que podríamos estar eliminando igualmente variables relevantes y quedándonos con irrelevantes. [@sunInappropriateUseBivariable1996]
+
+Probablemente una estrategia adecuada sería priorizar el conocimiento de expertos a priori en la selección de variables.
+
+Si después de esa selección a priori de variables es necesario la reducción de variables para el modelo por alguna razón, se recomienda un aproximamiento backwards, es decir, una vez tener habiendo usado todas las variables para el modelo, reducir el número filtrando por R2 ajustado, MSE, AIC o valores p.
+
+## Análisis de Cox univariable
+
+```{r}
+adsl$TRT01A <- factor(adsl$TRT01A, levels = c("Placebo", "Anticuerpo Monoclonal"))
+adsl$STRAT1 <- factor(adsl$STRAT1, levels = c("PORTADOR", "NO PORTADOR"))
+cox_univariable <- adsl |>
+  left_join(
+    adtte |> select(USUBJID, AVAL, CNSR),
+    by = "USUBJID") |>
+  select(AGE,SEX,STRAT1,ADASBL,MMSEBL,TRT01A,AVAL,CNSR) |> 
+  tbl_uvregression(
+    method = coxph,
+    y      = Surv(AVAL, 1-CNSR),
+    exponentiate = TRUE,
+    show_single_row = c("AGE", "SEX", "STRAT1", "ADASBL", "MMSEBL","TRT01A"),
+    label = list (
+      AGE = "Edad",
+      SEX = "Sexo (masculino)",
+      STRAT1 = "APOE (no portador)",
+      ADASBL = "ADAS-Cog Basal",
+      MMSEBL = "MMSE Basal"
+    )) |> 
+      bold_p() |> 
+      bold_labels()
+
+
+cox_univariable
+```
+
+En este caso, el sexo masculino, la no presencia de APOE y el ser tratado con anticuerpo monoclonal son factores protectores estadísticamente significativos con respecto al sexo femenino, la presencia de APOE y el tratamiento con placebo respectivamente. Por otro lado, la edad, el ADAS-Cog basal y el MMSE basal no son significativos con valores de p>0.3.
+
+## Análisis de Cox multivariable
+```{r}
+formula_cox_multivariable <- Surv(AVAL, 1-CNSR) ~ SEX + STRAT1 + TRT01A
+adsl$TRT01A <- factor(adsl$TRT01A, levels = c("Placebo", "Anticuerpo Monoclonal"))
+data_cox_multivariable <-adsl |> 
+  left_join(
+    adtte |> select(USUBJID,AVAL, CNSR),
+    by = "USUBJID") |>
+  select(AGE,SEX,STRAT1,ADASBL,MMSEBL,AVAL,TRT01A,CNSR)
+modelo_cox_multivariable <- coxph(formula_cox_multivariable, data = data_cox_multivariable)
+```
+
+```{r}
+tabla_multivariable <- tbl_regression(
+  modelo_cox_multivariable,
+  exponentiate = TRUE,
+  show_single_row = c("SEX","TRT01A","STRAT1"),
+  label = list(
+    SEX = "Sexo (masculino)",
+    STRAT1 = "APOE (no portador)",
+    TRT01A = "Anticuerpo Monoclonal")) |>
+  bold_p( t = 0.05) |>
+  bold_labels()
+tabla_multivariable 
+```
+
+```{r}
+asuncion_de_riesgos_proporcionales <- cox.zph(modelo_cox_multivariable)
+
+for(variable in rownames(asuncion_de_riesgos_proporcionales$table)){
+  p <- asuncion_de_riesgos_proporcionales$table[variable, "p"]
+  estado<- if 
+  (p>0.05) "OK - se cumple asunción de riesgos proporcionales"
+  else "AVISO - asunción de riesgos proporcionales NO se cumple"
+  cat(sprintf("%-12s p=%.4f -> %s\n", variable, p, estado))
+}
+
+asuncion_de_riesgos_proporcionales
+```
+# Bibliography
+::: {#refs}
+:::
