@@ -2,3 +2,4 @@ cdisc-adam-adtte-cox-analysis.code-workspace
 raw_data/
 from_raw_to_xpt_files/
 reference/
+km_cox_survival_files/
