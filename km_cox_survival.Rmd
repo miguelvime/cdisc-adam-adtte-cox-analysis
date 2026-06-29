@@ -21,7 +21,10 @@ library(tidyverse)
 library(patchwork)
 library(scales)
 library(survival)
+library(survminer)
 library(ggsurvfit)
+library(rpart)
+library(rpart.plot)
 ```
 
 # Cargar los datos de ADAM
@@ -102,7 +105,7 @@ combined_table
 
 Globalmente el número de eventos adversos tiene diferencias estadísticamente significativas entre los grupos. En concreto la frecuencia de la cefalea es significativamente distinta en el grupo control y en el de tratamiento. No se observan diferencias significativas de frecuencia de eventos adversos por sexo, por gravedad o por otros efectos adversos como reacción infusional, ARIA-H o ARIA-E.
 
-## Plot 
+## Gráficos de frecuencias 
 
 ```{r}
 n_por_brazo <- data.frame(
@@ -221,7 +224,7 @@ plot_survival<- ggsurvfit(survival_curves) +
     subtitle = "AD-01",
     x = "Días",
     y = "Probabilidad de supervivencia"
-  )
+  ) 
 plot_survival
 ```
 
@@ -229,13 +232,15 @@ plot_survival
 
 En este método se realizan modelos univariables, de esta manera se eligen aquellas variables cuyo valor de p sea menor que un umbral predefinido (p< 0.1 en este caso). Esto es un enfoque 'forward', en el que se van añadiendo variables a un modelos según su significancia.
 
+Este método de selección de variables tiene algunas limitaciones:
+
 Según [@heinzeFiveMythsVariable2017]: "Aunque es cierto que los coeficientes de regresión suelen ser mayores en modelos univariables que en multivariables, lo contrario puede también suceder". "El prefiltrado univariable no es un prerrequisito ni añade ningún beneficio al construir modelos multivariable".
 
 El problema de este método es que no controla por variables de confusión, por lo que podríamos estar eliminando igualmente variables relevantes y quedándonos con irrelevantes. [@sunInappropriateUseBivariable1996]
 
 Probablemente una estrategia adecuada sería priorizar el conocimiento de expertos a priori en la selección de variables.
 
-Si después de esa selección a priori de variables es necesario la reducción de variables para el modelo por alguna razón, se recomienda un aproximamiento backwards, es decir, una vez tener habiendo usado todas las variables para el modelo, reducir el número filtrando por R2 ajustado, MSE, AIC o valores p.
+Si después de esa selección a priori de variables es necesario la reducción de variables para el modelo por alguna razón, se recomienda un aproximamiento backwards, es decir, una vez tener habiendo usado todas las variables para el modelo, reducir el número filtrando por pseudo R2 ajustado o AIC.
 
 ## Análisis de Cox univariable
 
@@ -272,12 +277,12 @@ En este caso, el sexo masculino, la no presencia de APOE y el ser tratado con an
 ```{r}
 formula_cox_multivariable <- Surv(AVAL, 1-CNSR) ~ SEX + STRAT1 + TRT01A
 adsl$TRT01A <- factor(adsl$TRT01A, levels = c("Placebo", "Anticuerpo Monoclonal"))
-data_cox_multivariable <-adsl |> 
+data_posibles_variables <-adsl |> 
   left_join(
     adtte |> select(USUBJID,AVAL, CNSR),
     by = "USUBJID") |>
-  select(AGE,SEX,STRAT1,ADASBL,MMSEBL,AVAL,TRT01A,CNSR)
-modelo_cox_multivariable <- coxph(formula_cox_multivariable, data = data_cox_multivariable)
+  select(AGE,SEX,STRAT1,ADASBL,MMSEBL,AVAL,TRT01A,CNSR) 
+modelo_cox_multivariable <- coxph(formula_cox_multivariable, data = data_posibles_variables)
 ```
 
 ```{r}
@@ -294,19 +299,104 @@ tabla_multivariable <- tbl_regression(
 tabla_multivariable 
 ```
 
+El tratamiento con anticuerpos monoclonales sigue siendo protector con respecto al placebo en el modelo multivariante, sin embargo tanto el ser no portador de APOE como el sexo masculino ya no son estadísticamente significativos en el modelo realizado con datos simulados. Esta pérdida de significancia indica que el sexo y la mutación de APOE no poseen un efecto pronóstico independiente real. Su significancia univariable era espuria y desaparece al ajustar el riesgo continuo por el verdadero factor determinante de la supervivencia (el tratamiento)
+
 ```{r}
 asuncion_de_riesgos_proporcionales <- cox.zph(modelo_cox_multivariable)
 
 for(variable in rownames(asuncion_de_riesgos_proporcionales$table)){
   p <- asuncion_de_riesgos_proporcionales$table[variable, "p"]
-  estado<- if 
-  (p>0.05) "OK - se cumple asunción de riesgos proporcionales"
-  else "AVISO - asunción de riesgos proporcionales NO se cumple"
+  estado <- if (p > 0.05) "OK - se cumple asunción de riesgos proporcionales" else "AVISO - asunción de riesgos proporcionales NO se cumple"
   cat(sprintf("%-12s p=%.4f -> %s\n", variable, p, estado))
 }
-
-asuncion_de_riesgos_proporcionales
 ```
-# Bibliography
+
+```{r}
+
+forest_plot <- ggforest(model = modelo_cox_multivariable,
+                        data = as.data.frame(data_posibles_variables))
+forest_plot
+```
+
+# Árbol de decisión
+
+Se realiza un árbol de decisión de forma exploratoria para identificar subgrupos de paciente con diferente pronóstico.
+```{r}
+arbol_de_decision<- rpart(
+  Surv(AVAL,1-CNSR)~ AGE+ SEX+ STRAT1+ ADASBL+ MMSEBL+TRT01A, 
+  data = data_posibles_variables, 
+  method = "exp",
+  control = rpart.control(
+    cp=0.01,
+    minsplit = 20,
+    minbucket = 10
+  ))
+rpart.plot(arbol_de_decision,
+           type = 3,
+           extra = 101,
+           fallen.leaves = FALSE)
+```
+
+Se identifición de 4 subgrupos dependiendo de la rama de tratamiento y de la edad. En orden de mejor a peor pronóstico. Los puntos de corte de edad serían distintos en el grupo tratamiento (77 años) y el grupo placebo (85 años).
+
+En realidad observamos que la única variable que es significativa en el modelo multivariable de Cox es tratamiento con respecto a placebo, en cuanto reducimos la complexidad del árbol coincide, solo aumentándola aparece la edad. 
+
+## Curvan K-M por grupo
+
+```{r}
+
+data_posibles_variables$node<- as.factor(arbol_de_decision$where)
+
+
+data_posibles_variables <- data_posibles_variables %>%
+  mutate(node_label = case_when(
+    node == 3 ~ "Anticuerpo Monoclonal <77",
+    node == 4 ~ "Anticuerpo Monoclonal >77",
+    node == 6 ~ "Placebo >85",
+    node == 7 ~ "Placebo <85"
+  ))
+
+km_segun_arbol_de_decision<- ggsurvfit(survfit2(Surv(AVAL,1-CNSR)~node_label, data = data_posibles_variables)) + 
+  add_confidence_interval() +
+  add_risktable(
+    risktable_stats = "n.risk",
+    risktable_height = 0.33,
+    size = 4) +
+  add_risktable_strata_symbol(symbol = "\U25CF",size =10) +
+  add_censor_mark() +
+  scale_ggsurvfit() +
+  add_quantile() +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(ncol = 2))
+
+km_segun_arbol_de_decision
+```
+
+De esta manera el gráfico no es informativo por el gran intervalo de confianza del grupo placebo >85 años, debido probablemente a su mínima muestra (18 pacientes) y tenemos grupos con una muestra muy pequeña (el grupo placebo >85 solo tiene 18 pacientes). Elimino ese grupo.
+
+```{r}
+data_posibles_variables <- data_posibles_variables |> 
+  filter(node_label != "Placebo >85" )
+
+
+km_segun_arbol_de_decision<- ggsurvfit(survfit2(Surv(AVAL,1-CNSR)~node_label, data = data_posibles_variables)) + 
+  add_confidence_interval() +
+  add_risktable(
+    risktable_stats = "n.risk",
+    risktable_height = 0.33,
+    size = 4) +
+  add_risktable_strata_symbol(symbol = "\U25CF",size =10) +
+  add_censor_mark() +
+  scale_ggsurvfit() +
+  add_quantile() +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(ncol = 2))
+
+km_segun_arbol_de_decision
+```
+
+Si el objetivo del árbol de decisión fuera de alguna manera estratificar a los pacientes, por ejemplo para incluirlos en programas de prevención, estratificarlos según el placebo no tendría sentido pues todos los pacientes serían tratados.
+
+# Bibliografía
 ::: {#refs}
 :::

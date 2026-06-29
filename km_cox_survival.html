@@ -110,7 +110,7 @@ div.csl-indent {
   <li><a href="#cargar-los-datos-de-adam" id="toc-cargar-los-datos-de-adam" class="nav-link" data-scroll-target="#cargar-los-datos-de-adam">Cargar los datos de ADAM</a></li>
   <li><a href="#diferencias-en-frecuencia-de-eventos-adversos-por-rama-de-tratamiento" id="toc-diferencias-en-frecuencia-de-eventos-adversos-por-rama-de-tratamiento" class="nav-link" data-scroll-target="#diferencias-en-frecuencia-de-eventos-adversos-por-rama-de-tratamiento">Diferencias en frecuencia de eventos adversos por rama de tratamiento</a>
   <ul class="collapse">
-  <li><a href="#plot" id="toc-plot" class="nav-link" data-scroll-target="#plot">Plot</a></li>
+  <li><a href="#gráficos-de-frecuencias" id="toc-gráficos-de-frecuencias" class="nav-link" data-scroll-target="#gráficos-de-frecuencias">Gráficos de frecuencias</a></li>
   </ul></li>
   <li><a href="#análisis-de-supervivencia-curvas-kaplan-meier" id="toc-análisis-de-supervivencia-curvas-kaplan-meier" class="nav-link" data-scroll-target="#análisis-de-supervivencia-curvas-kaplan-meier">Análisis de supervivencia: curvas Kaplan-Meier</a></li>
   <li><a href="#método-de-filtrado-forward-por-p-valor" id="toc-método-de-filtrado-forward-por-p-valor" class="nav-link" data-scroll-target="#método-de-filtrado-forward-por-p-valor">Método de filtrado “forward” por p-valor</a>
@@ -118,7 +118,11 @@ div.csl-indent {
   <li><a href="#análisis-de-cox-univariable" id="toc-análisis-de-cox-univariable" class="nav-link" data-scroll-target="#análisis-de-cox-univariable">Análisis de Cox univariable</a></li>
   <li><a href="#análisis-de-cox-multivariable" id="toc-análisis-de-cox-multivariable" class="nav-link" data-scroll-target="#análisis-de-cox-multivariable">Análisis de Cox multivariable</a></li>
   </ul></li>
-  <li><a href="#bibliography" id="toc-bibliography" class="nav-link" data-scroll-target="#bibliography">Bibliography</a></li>
+  <li><a href="#árbol-de-decisión" id="toc-árbol-de-decisión" class="nav-link" data-scroll-target="#árbol-de-decisión">Árbol de decisión</a>
+  <ul class="collapse">
+  <li><a href="#curvan-k-m-por-grupo" id="toc-curvan-k-m-por-grupo" class="nav-link" data-scroll-target="#curvan-k-m-por-grupo">Curvan K-M por grupo</a></li>
+  </ul></li>
+  <li><a href="#bibliografía" id="toc-bibliografía" class="nav-link" data-scroll-target="#bibliografía">Bibliografía</a></li>
   </ul>
 </nav>
 </div>
@@ -167,7 +171,10 @@ div.csl-indent {
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(patchwork)</span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(scales)</span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(survival)</span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggsurvfit)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(survminer)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggsurvfit)</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rpart)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(rpart.plot)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 </section>
 <section id="cargar-los-datos-de-adam" class="level1">
@@ -847,8 +854,8 @@ N = 133<span class="gt_footnote_marks" style="white-space:nowrap;font-style:ital
 </div>
 </div>
 <p>Globalmente el número de eventos adversos tiene diferencias estadísticamente significativas entre los grupos. En concreto la frecuencia de la cefalea es significativamente distinta en el grupo control y en el de tratamiento. No se observan diferencias significativas de frecuencia de eventos adversos por sexo, por gravedad o por otros efectos adversos como reacción infusional, ARIA-H o ARIA-E.</p>
-<section id="plot" class="level2">
-<h2 class="anchored" data-anchor-id="plot">Plot</h2>
+<section id="gráficos-de-frecuencias" class="level2">
+<h2 class="anchored" data-anchor-id="gráficos-de-frecuencias">Gráficos de frecuencias</h2>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>n_por_brazo <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
 <span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">TRT01A =</span> <span class="fu">c</span>(<span class="st">"Anticuerpo Monoclonal"</span>, <span class="st">"Placebo"</span>),</span>
@@ -975,7 +982,7 @@ N = 133<span class="gt_footnote_marks" style="white-space:nowrap;font-style:ital
 <span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">"AD-01"</span>,</span>
 <span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Días"</span>,</span>
 <span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">"Probabilidad de supervivencia"</span></span>
-<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb8-19"><a href="#cb8-19" aria-hidden="true" tabindex="-1"></a>  ) </span>
 <span id="cb8-20"><a href="#cb8-20" aria-hidden="true" tabindex="-1"></a>plot_survival</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output-display">
 <div>
@@ -989,10 +996,11 @@ N = 133<span class="gt_footnote_marks" style="white-space:nowrap;font-style:ital
 <section id="método-de-filtrado-forward-por-p-valor" class="level1">
 <h1>Método de filtrado “forward” por p-valor</h1>
 <p>En este método se realizan modelos univariables, de esta manera se eligen aquellas variables cuyo valor de p sea menor que un umbral predefinido (p&lt; 0.1 en este caso). Esto es un enfoque ‘forward’, en el que se van añadiendo variables a un modelos según su significancia.</p>
+<p>Este método de selección de variables tiene algunas limitaciones:</p>
 <p>Según <span class="citation" data-cites="heinzeFiveMythsVariable2017">[<a href="#ref-heinzeFiveMythsVariable2017" role="doc-biblioref">1</a>]</span>: “Aunque es cierto que los coeficientes de regresión suelen ser mayores en modelos univariables que en multivariables, lo contrario puede también suceder”. “El prefiltrado univariable no es un prerrequisito ni añade ningún beneficio al construir modelos multivariable”.</p>
 <p>El problema de este método es que no controla por variables de confusión, por lo que podríamos estar eliminando igualmente variables relevantes y quedándonos con irrelevantes. <span class="citation" data-cites="sunInappropriateUseBivariable1996">[<a href="#ref-sunInappropriateUseBivariable1996" role="doc-biblioref">2</a>]</span></p>
 <p>Probablemente una estrategia adecuada sería priorizar el conocimiento de expertos a priori en la selección de variables.</p>
-<p>Si después de esa selección a priori de variables es necesario la reducción de variables para el modelo por alguna razón, se recomienda un aproximamiento backwards, es decir, una vez tener habiendo usado todas las variables para el modelo, reducir el número filtrando por R2 ajustado, MSE, AIC o valores p.</p>
+<p>Si después de esa selección a priori de variables es necesario la reducción de variables para el modelo por alguna razón, se recomienda un aproximamiento backwards, es decir, una vez tener habiendo usado todas las variables para el modelo, reducir el número filtrando por R2 ajustado, MSE o AIC.</p>
 <section id="análisis-de-cox-univariable" class="level2">
 <h2 class="anchored" data-anchor-id="análisis-de-cox-univariable">Análisis de Cox univariable</h2>
 <div class="cell">
@@ -1542,12 +1550,12 @@ N = 133<span class="gt_footnote_marks" style="white-space:nowrap;font-style:ital
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>formula_cox_multivariable <span class="ot">&lt;-</span> <span class="fu">Surv</span>(AVAL, <span class="dv">1</span><span class="sc">-</span>CNSR) <span class="sc">~</span> SEX <span class="sc">+</span> STRAT1 <span class="sc">+</span> TRT01A</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>adsl<span class="sc">$</span>TRT01A <span class="ot">&lt;-</span> <span class="fu">factor</span>(adsl<span class="sc">$</span>TRT01A, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"Placebo"</span>, <span class="st">"Anticuerpo Monoclonal"</span>))</span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>data_cox_multivariable <span class="ot">&lt;-</span>adsl <span class="sc">|&gt;</span> </span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>data_posibles_variables <span class="ot">&lt;-</span>adsl <span class="sc">|&gt;</span> </span>
 <span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(</span>
 <span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>    adtte <span class="sc">|&gt;</span> <span class="fu">select</span>(USUBJID,AVAL, CNSR),</span>
 <span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="st">"USUBJID"</span>) <span class="sc">|&gt;</span></span>
-<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(AGE,SEX,STRAT1,ADASBL,MMSEBL,AVAL,TRT01A,CNSR)</span>
-<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>modelo_cox_multivariable <span class="ot">&lt;-</span> <span class="fu">coxph</span>(formula_cox_multivariable, <span class="at">data =</span> data_cox_multivariable)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(AGE,SEX,STRAT1,ADASBL,MMSEBL,AVAL,TRT01A,CNSR) </span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>modelo_cox_multivariable <span class="ot">&lt;-</span> <span class="fu">coxph</span>(formula_cox_multivariable, <span class="at">data =</span> data_posibles_variables)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>tabla_multivariable <span class="ot">&lt;-</span> <span class="fu">tbl_regression</span>(</span>
@@ -2051,35 +2059,132 @@ N = 133<span class="gt_footnote_marks" style="white-space:nowrap;font-style:ital
 </div>
 </div>
 </div>
+<p>El tratamiento con anticuerpos monoclonales sigue siendo protector con respecto al placebo en el modelo multivariante, sin embargo tanto el ser no portador de APOE como el sexo masculino ya no son estadísticamente significativos en el modelo realizado con datos simulados. Esto podría deberse a que el supuesto efecto de estas variables en el modelo univariante pueda ser explicado en parte por el efecto de la variable tratamiento.</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>asuncion_de_riesgos_proporcionales <span class="ot">&lt;-</span> <span class="fu">cox.zph</span>(modelo_cox_multivariable)</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(variable <span class="cf">in</span> <span class="fu">rownames</span>(asuncion_de_riesgos_proporcionales<span class="sc">$</span>table)){</span>
 <span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> asuncion_de_riesgos_proporcionales<span class="sc">$</span>table[variable, <span class="st">"p"</span>]</span>
-<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  estado<span class="ot">&lt;-</span> <span class="cf">if</span> </span>
-<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  (p<span class="sc">&gt;</span><span class="fl">0.05</span>) <span class="st">"OK - se cumple asunción de riesgos proporcionales"</span></span>
-<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">else</span> <span class="st">"AVISO - asunción de riesgos proporcionales NO se cumple"</span></span>
-<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"%-12s p=%.4f -&gt; %s</span><span class="sc">\n</span><span class="st">"</span>, variable, p, estado))</span>
-<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  estado <span class="ot">&lt;-</span> <span class="cf">if</span> (p <span class="sc">&gt;</span> <span class="fl">0.05</span>) <span class="st">"OK - se cumple asunción de riesgos proporcionales"</span> <span class="cf">else</span> <span class="st">"AVISO - asunción de riesgos proporcionales NO se cumple"</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">cat</span>(<span class="fu">sprintf</span>(<span class="st">"%-12s p=%.4f -&gt; %s</span><span class="sc">\n</span><span class="st">"</span>, variable, p, estado))</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>}</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>SEX          p=0.5327 -&gt; OK - se cumple asunción de riesgos proporcionales
 STRAT1       p=0.5841 -&gt; OK - se cumple asunción de riesgos proporcionales
 TRT01A       p=0.1948 -&gt; OK - se cumple asunción de riesgos proporcionales
 GLOBAL       p=0.5011 -&gt; OK - se cumple asunción de riesgos proporcionales</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>asuncion_de_riesgos_proporcionales</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>       chisq df    p
-SEX    0.389  1 0.53
-STRAT1 0.300  1 0.58
-TRT01A 1.681  1 0.19
-GLOBAL 2.360  3 0.50</code></pre>
+</div>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>forest_plot <span class="ot">&lt;-</span> <span class="fu">ggforest</span>(<span class="at">model =</span> modelo_cox_multivariable,</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>                        <span class="at">data =</span> <span class="fu">as.data.frame</span>(data_posibles_variables))</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>forest_plot</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="km_cox_survival_files/figure-html/unnamed-chunk-12-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
 </div>
 </div>
 </section>
 </section>
-<section id="bibliography" class="level1">
-<h1>Bibliography</h1>
+<section id="árbol-de-decisión" class="level1">
+<h1>Árbol de decisión</h1>
+<p>Se realiza un árbol de decisión de forma exploratoria para identificar subgrupos de paciente con diferente pronóstico.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>arbol_de_decision<span class="ot">&lt;-</span> <span class="fu">rpart</span>(</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">Surv</span>(AVAL,<span class="dv">1</span><span class="sc">-</span>CNSR)<span class="sc">~</span> AGE<span class="sc">+</span> SEX<span class="sc">+</span> STRAT1<span class="sc">+</span> ADASBL<span class="sc">+</span> MMSEBL<span class="sc">+</span>TRT01A, </span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">data =</span> data_posibles_variables, </span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>  <span class="at">method =</span> <span class="st">"exp"</span>,</span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">control =</span> <span class="fu">rpart.control</span>(</span>
+<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">cp=</span><span class="fl">0.01</span>,</span>
+<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">minsplit =</span> <span class="dv">20</span>,</span>
+<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">minbucket =</span> <span class="dv">10</span></span>
+<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a><span class="fu">rpart.plot</span>(arbol_de_decision,</span>
+<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>           <span class="at">type =</span> <span class="dv">3</span>,</span>
+<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>           <span class="at">extra =</span> <span class="dv">101</span>,</span>
+<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>           <span class="at">fallen.leaves =</span> <span class="cn">FALSE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="km_cox_survival_files/figure-html/unnamed-chunk-13-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Se identifición de 4 subgrupos dependiendo de la rama de tratamiento y de la edad. En orden de mejor a peor pronóstico. Los puntos de corte de edad serían distintos en el grupo tratamiento (77 años) y el grupo placebo (85 años).</p>
+<p>En realidad observamos que la única variable que es significativa en el modelo multivariable de Cox es tratamiento con respecto a placebo, en cuanto reducimos la complexidad del árbol coincide, solo aumentándola aparece la edad.</p>
+<section id="curvan-k-m-por-grupo" class="level2">
+<h2 class="anchored" data-anchor-id="curvan-k-m-por-grupo">Curvan K-M por grupo</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>data_posibles_variables<span class="sc">$</span>node<span class="ot">&lt;-</span> <span class="fu">as.factor</span>(arbol_de_decision<span class="sc">$</span>where)</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>data_posibles_variables <span class="ot">&lt;-</span> data_posibles_variables <span class="sc">%&gt;%</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">node_label =</span> <span class="fu">case_when</span>(</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    node <span class="sc">==</span> <span class="dv">3</span> <span class="sc">~</span> <span class="st">"Anticuerpo Monoclonal &lt;77"</span>,</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    node <span class="sc">==</span> <span class="dv">4</span> <span class="sc">~</span> <span class="st">"Anticuerpo Monoclonal &gt;77"</span>,</span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>    node <span class="sc">==</span> <span class="dv">6</span> <span class="sc">~</span> <span class="st">"Placebo &gt;85"</span>,</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    node <span class="sc">==</span> <span class="dv">7</span> <span class="sc">~</span> <span class="st">"Placebo &lt;85"</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>km_segun_arbol_de_decision<span class="ot">&lt;-</span> <span class="fu">ggsurvfit</span>(<span class="fu">survfit2</span>(<span class="fu">Surv</span>(AVAL,<span class="dv">1</span><span class="sc">-</span>CNSR)<span class="sc">~</span>node_label, <span class="at">data =</span> data_posibles_variables)) <span class="sc">+</span> </span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_confidence_interval</span>() <span class="sc">+</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_risktable</span>(</span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">risktable_stats =</span> <span class="st">"n.risk"</span>,</span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">risktable_height =</span> <span class="fl">0.33</span>,</span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_risktable_strata_symbol</span>(<span class="at">symbol =</span> <span class="st">"\U25CF"</span>,<span class="at">size =</span><span class="dv">10</span>) <span class="sc">+</span></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_censor_mark</span>() <span class="sc">+</span></span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_ggsurvfit</span>() <span class="sc">+</span></span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_quantile</span>() <span class="sc">+</span></span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"bottom"</span>) <span class="sc">+</span></span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">guides</span>(<span class="at">color =</span> <span class="fu">guide_legend</span>(<span class="at">ncol =</span> <span class="dv">2</span>))</span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a>km_segun_arbol_de_decision</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="km_cox_survival_files/figure-html/unnamed-chunk-14-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>De esta manera el gráfico no es informativo por el gran intervalo de confianza del grupo placebo &lt;85 años, debido probablemente a su mínima muestra (18 pacientes) y tenemos grupos con una muestra muy pequeña (el grupo placebo &lt;85 solo tiene 18 pacientes). Elimino ese grupo.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>data_posibles_variables <span class="ot">&lt;-</span> data_posibles_variables <span class="sc">|&gt;</span> </span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(node_label <span class="sc">!=</span> <span class="st">"Placebo &gt;85"</span> )</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>km_segun_arbol_de_decision<span class="ot">&lt;-</span> <span class="fu">ggsurvfit</span>(<span class="fu">survfit2</span>(<span class="fu">Surv</span>(AVAL,<span class="dv">1</span><span class="sc">-</span>CNSR)<span class="sc">~</span>node_label, <span class="at">data =</span> data_posibles_variables)) <span class="sc">+</span> </span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_confidence_interval</span>() <span class="sc">+</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_risktable</span>(</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">risktable_stats =</span> <span class="st">"n.risk"</span>,</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">risktable_height =</span> <span class="fl">0.33</span>,</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">size =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_risktable_strata_symbol</span>(<span class="at">symbol =</span> <span class="st">"\U25CF"</span>,<span class="at">size =</span><span class="dv">10</span>) <span class="sc">+</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_censor_mark</span>() <span class="sc">+</span></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_ggsurvfit</span>() <span class="sc">+</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_quantile</span>() <span class="sc">+</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"bottom"</span>) <span class="sc">+</span></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">guides</span>(<span class="at">color =</span> <span class="fu">guide_legend</span>(<span class="at">ncol =</span> <span class="dv">2</span>))</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>km_segun_arbol_de_decision</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="km_cox_survival_files/figure-html/unnamed-chunk-15-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Si el objetivo del árbol de decisión fuera de alguna manera estratificar a los pacientes, por ejemplo para incluirlos en programas de prevención, estratificarlos según el placebo no tendría sentido pues todos los pacientes serían tratados.</p>
+</section>
+</section>
+<section id="bibliografía" class="level1">
+<h1>Bibliografía</h1>
 <div id="refs" class="references csl-bib-body" data-entry-spacing="0" role="list">
 <div id="ref-heinzeFiveMythsVariable2017" class="csl-entry" role="listitem">
 <div class="csl-left-margin">[1] </div><div class="csl-right-inline">Heinze G, Dunkler D. Five myths about variable selection. Transplant International: Official Journal of the European Society for Organ Transplantation 2017;30:6–10. <a href="https://doi.org/10.1111/tri.12895">https://doi.org/10.1111/tri.12895</a>.</div>
